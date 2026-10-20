@@ -7,10 +7,8 @@ struct GameGridView: View {
     @Binding var selectionSource: SelectionSource
     @State private var gamesToDelete: [Game] = []
 
-    /// Only custom (non-stock) games in the explorer
-    private var customGames: [Game] {
-        appState.filteredGames.filter { !$0.isStock }
-    }
+    /// Redraw when the View options change
+    @ObservedObject private var librarySettings = LibrarySettings.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -61,7 +59,9 @@ struct GameGridView: View {
                         columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns),
                         spacing: 16
                     ) {
-                        ForEach(customGames) { game in
+                        ForEach(appState.explorerSections) { section in
+                          Section {
+                           ForEach(section.games) { game in
                             GameCardView(
                                 game: game,
                                 isActive: game == appState.selectedGame && selectionSource == .explorer,
@@ -82,13 +82,23 @@ struct GameGridView: View {
                             .contextMenu {
                                 gameContextMenu(for: game)
                             }
+                           }
+                          } header: {
+                            if !section.title.isEmpty {
+                                Text(section.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                          }
                         }
                     }
                     .padding(16)
                 }
+                .modifier(ExplorerKeyboard { gamesToDelete = $0 })
             }
             .overlay {
-                if customGames.isEmpty {
+                if appState.explorerGames.isEmpty {
                     ContentUnavailableView {
                         Label("No Games", systemImage: "gamecontroller")
                     } description: {
@@ -129,20 +139,6 @@ struct GameGridView: View {
     /// Right-click menu; commands apply to the whole selection when the clicked game is in it
     @ViewBuilder
     private func gameContextMenu(for game: Game) -> some View {
-        let targets = appState.contextTargets(for: game)
-        let local = targets.filter { $0.source == .local }
-        let suffix = targets.count > 1 ? " (\(targets.count) games)" : ""
-
-        Button("Select Emulation Core...\(suffix)") {
-            appState.openCoreDialog(for: local)
-        }
-        .disabled(local.isEmpty)
-
-        Divider()
-
-        Button("Delete\(targets.count > 1 ? " \(local.count) Games" : " Game")...") {
-            gamesToDelete = local
-        }
-        .disabled(local.isEmpty)
+        LibraryContextMenu(game: game) { gamesToDelete = $0 }
     }
 }

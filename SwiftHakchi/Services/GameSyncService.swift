@@ -249,6 +249,12 @@ actor GameSyncService {
         return dir
     }
 
+    /// Regular files under a game folder as (relative path, URL), skipping hidden files
+    /// (kept for callers of the Phase 1 API)
+    static func gameFiles(in dir: URL) -> [(String, URL)] {
+        SyncFileBuilder.regularFiles(in: dir)
+    }
+
     static var originalGamesCacheDirectory: URL {
         AppConfig.configDirectory.appendingPathComponent("games_cache", isDirectory: true)
     }

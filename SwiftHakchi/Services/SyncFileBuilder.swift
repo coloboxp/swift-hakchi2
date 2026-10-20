@@ -103,7 +103,8 @@ struct SyncFileBuilder {
             mediaPath = context.squashfsGamesPath
             iconPath = context.squashfsGamesPath
         } else if let dir = game.directory {
-            result.files += gameFiles(code: code, directory: dir, to: storageDir)
+            result.files += gameFiles(code: code, directory: dir, to: storageDir,
+                                      romFileName: game.desktop.romPath.map { ($0 as NSString).lastPathComponent })
             if !game.isOriginal && !Self.hasRomFile(desktop: game.desktop, directory: dir) {
                 result.missingRoms.append(code)
             }
@@ -121,29 +122,36 @@ struct SyncFileBuilder {
         result.files.append(.generated(path: "\(menuDir)/\(code).desktop", data: desktop.toData()))
     }
 
-    /// The game folder's files under `targetDir`; the cover is resized for the console
-    /// and a 40×40 thumbnail is made when the folder has none
-    private func gameFiles(code: String, directory: URL, to targetDir: String) -> [SyncFile] {
+    /// The game folder's files under `targetDir`. Covers are uploaded as they are (they are
+    /// sized at import and the thumbnail follows the box-art settings); only missing ones are
+    /// made here. A ROM with Game Genie codes is replaced by a patched copy (CE patches a
+    /// temporary copy, the library file stays untouched).
+    private func gameFiles(code: String, directory: URL, to targetDir: String, romFileName: String?) -> [SyncFile] {
         let skipped = Self.skippedNames(code: code)
         var files: [SyncFile] = []
         var cover: Data?
+        var hasCover = false
         var hasSmall = false
 
         for (relative, url) in Self.regularFiles(in: directory) {
             let name = (relative as NSString).lastPathComponent
             if !relative.contains("/") && skipped.contains(name) { continue }
             if relative == "\(code).png" {
+                hasCover = true
                 cover = try? Data(contentsOf: url)
-                continue
             }
             if relative == "\(code)_small.png" { hasSmall = true }
+            if relative == romFileName, let romFileName,
+               let patched = try? GameGenie.patchedRom(gameDirectory: directory, romFileName: romFileName) {
+                files.append(.generated(path: "\(targetDir)/\(relative)", data: patched))
+                continue
+            }
             if let f = SyncFile.file(path: "\(targetDir)/\(relative)", url: url) { files.append(f) }
         }
 
-        let coverData = cover.map { resizeCoverArt(data: $0, width: context.consoleType.coverWidth,
-                                                   height: context.consoleType.coverHeight) }
-            ?? Self.placeholderPNG()
-        files.append(.generated(path: "\(targetDir)/\(code).png", data: coverData))
+        if !hasCover {
+            files.append(.generated(path: "\(targetDir)/\(code).png", data: Self.placeholderPNG()))
+        }
         if !hasSmall {
             let small = cover.map { resizeCoverArt(data: $0, width: 40, height: 40) } ?? Self.placeholderPNG()
             files.append(.generated(path: "\(targetDir)/\(code)_small.png", data: small))

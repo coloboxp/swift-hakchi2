@@ -97,7 +97,7 @@ final class AppConfig: ObservableObject, Codable {
 
     /// Base path for game data on disk
     var gamesDirectory: URL {
-        Self.configDirectory.appendingPathComponent("games", isDirectory: true)
+        Self.configDirectory.appendingPathComponent(LibraryStorage.gamesFolderName(for: lastConsoleType), isDirectory: true)
     }
 
     /// Path for downloaded data files

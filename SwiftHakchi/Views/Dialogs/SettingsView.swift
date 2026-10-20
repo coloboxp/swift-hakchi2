@@ -19,6 +19,9 @@ struct SettingsView: View {
                     Label("Storage", systemImage: "externaldrive")
                 }
 
+            LibrarySettingsTab()
+                .tabItem { Label("Library", systemImage: "books.vertical") }
+
             advancedTab
                 .tabItem {
                     Label("Advanced", systemImage: "gearshape.2")

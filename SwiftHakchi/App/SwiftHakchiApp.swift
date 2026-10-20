@@ -40,8 +40,12 @@ struct SwiftHakchiApp: App {
             KernelCommands(appState: appState)
             ModulesCommands(appState: appState)
             ToolsCommands(appState: appState)
-            HelpCommands(appState: appState)
-            Group {  // the commands builder takes at most 10 entries
+            // the commands builder takes at most 10 entries, hence the groups
+            Group {
+                HelpCommands(appState: appState)
+                LibraryCommands(appState: appState, settings: LibrarySettings.shared)
+            }
+            Group {
                 CommandGroup(replacing: .toolbar) {}
                 CommandGroup(replacing: .sidebar) {}
             }

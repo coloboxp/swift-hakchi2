@@ -43,16 +43,21 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 |---|---|---|
 | Folders Manager (tree editor, auto-structure buttons, `folders*.htm`) | `FoldersManagerForm.cs` | ✅ |
 | Selection presets | `MainForm` | ✅ |
-| View: original games position, sort by name/core/console/region, group without box art | `MainForm` | ⬜ |
-| Context menu: add/remove prefix, set region, archive `.clvg`, compress, delete box art, scan box art, repair games, show in Finder | `MainForm` | ⬜ |
-| Detail panel: sort name, copyright, region, save count, compress toggle, size, cover from file/paste/drop | `MainForm` | ⬜ |
-| Add custom app | `NewCustomGameForm.cs` | ⬜ |
-| Restore original games | `MainForm` | ⬜ |
+| View: original games position, sort by name/core/console/region, group without box art | `MainForm` | ✅ (original games default to Hidden, they already have their own tab) |
+| Context menu: add/remove prefix, set region, scrape selected, archive `.clvg`, compress/decompress, delete box art, scan box art, repair games, show in Finder | `MainForm` | ✅ |
+| Detail panel: sort name, copyright, max players, genre list, region, save count, compress toggle, ID/size, cover from file/paste/drop, autosave | `MainForm` | ✅ |
+| Add custom app | `NewCustomGameForm.cs` | ✅ |
+| Restore original games (bundled `desktop_entries.tar`) | `MainForm` | ✅ |
+| Cover matching (CRC, MD Mini art, sibling image, fuzzy), Select cover dialog, prepare art folders, blank covers, 8-bit box art | `NesApplication.FindCover`, `SelectCoverDialog`, `SelectSystemDialog` | ✅ |
 | Cover matching from local `art/` folder, prepare art folders | `NesApplication.FindCover`, `SelectSystemDialog` | ⬜ |
 | IPS patches | `NesApplication.FindPatch` | ✅ |
 | NES iNES checks, FDS header strip, SNES → SFROM conversion | `NesGame`, `FdsGame`, `SnesGame` | ✅ |
-| Separate local game storage per console family | `ConfigIni.SeparateGameLocalStorage` | ⬜ |
-| Game Genie codes | `GameGenie*` (disabled in CE) | ⬜ |
+| Separate local game storage per console family | `ConfigIni.SeparateGameLocalStorage` | ✅ |
+| Mega Drive Mini art (`CODE_mdmini.png`) and spine generator with templates | `SetMdMini`, `SpineForm` | ✅ |
+| Drag and drop: images (cover), games, `.hmod`/archives (module library), `.hrepo` | `MainForm.dragDrop` | ✅ |
+| Keyboard: ⌘A, Esc, Space, Delete in the explorer | `MainForm` | ✅ |
+| TheGamesDB fixes: genre names, publisher names, debounced key check | `ScraperForm` | ✅ |
+| Game Genie codes: database, per-game `gamegenie.txt`, NES/SNES patchers (`GameGenie.patchedRom`, used by sync) | `GameGenie*` | ✅ |
 
 ## Phase 4 — Settings
 
@@ -60,7 +65,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 |---|---|---|
 | Controller hacks (reset combo, autofire, X/Y autofire, Famicom start) | `ConfigIni.consoleSettings` | ✅ |
 | Disable epilepsy protection, global extra command-line args | `ConfigIni` | ✅ |
-| Compress games / box art, center thumbnail, convert to SFROM, import scraper | `ConfigIni` | ⬜ |
+| Compress games / box art, center thumbnail, convert to SFROM, import scraper, disable pop-ups | `ConfigIni` | ✅ |
 | SEGA UI theme (Mega Drive) | `MainForm` | ✅ |
 | Save settings to mini now | `MainForm` | ✅ |
 | hakchi + romfiles.xml update check | `MainForm` | ⬜ |

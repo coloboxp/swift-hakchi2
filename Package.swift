@@ -69,6 +69,11 @@ let package = Package(
                 .copy("Resources/AppIcon.icns"),
                 .copy("Resources/folder_images"),
                 .copy("Resources/splash.gz"),
+                .copy("Resources/BlankCovers"),
+                .copy("Resources/SpineTemplates"),
+                .copy("Resources/GameGenieDB.xml"),
+                .copy("Resources/desktop_entries.tar"),
+                .copy("Resources/original_art.tar"),
             ],
             linkerSettings: [
                 .linkedFramework("IOKit"),
