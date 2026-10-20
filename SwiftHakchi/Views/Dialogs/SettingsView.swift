@@ -23,8 +23,13 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Advanced", systemImage: "gearshape.2")
                 }
+
+            ConsoleSettingsView()
+                .tabItem {
+                    Label("Console Settings", systemImage: "slider.horizontal.3")
+                }
         }
-        .frame(width: 450, height: 300)
+        .frame(width: 520, height: 560)
         .onChange(of: config.lastConsoleType) { _, _ in config.save() }
         .onChange(of: config.separateGameStorage) { _, _ in config.save() }
         .onChange(of: config.uploadCompressed) { _, _ in config.save() }

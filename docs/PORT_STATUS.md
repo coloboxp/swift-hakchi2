@@ -25,21 +25,23 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Incremental sync (remote file diff, upload only changes, cleanup) | `Tasks/SyncTask.cs` | ⬜ |
-| Menu structure modes (no split, pages, folders, by letter, original games in root…) | `NesMenuCollection.Split` | ⬜ |
-| Max games per folder, back button position, home folder, folder image sets | `ConfigIni`, `NesMenuFolder.cs` | ⬜ |
-| Separate games for multiboot (`<sync>/<system-code>`) | `SyncTask` | ⬜ |
-| Linked sync (`.storage`) on/off, always copy original games | `SyncTask` | ⬜ |
-| Free-space check (memory stats) | `MemoryStats.cs` | ⬜ |
-| Push console settings (`cfg_*`) after sync | `hakchi.SyncConfig` | ⬜ |
+| Incremental sync (remote file diff, upload only changes, cleanup) | `Tasks/SyncTask.cs` | ✅ |
+| Menu structure modes (no split, pages, folders, by letter, original games in root…) | `NesMenuCollection.Split` | ✅ |
+| Max games per folder, back button position, home folder, folder image sets | `ConfigIni`, `NesMenuFolder.cs` | ✅ |
+| Separate games for multiboot (`<sync>/<system-code>`) | `SyncTask` | ✅ |
+| Linked sync (`.storage`) on/off, always copy original games | `SyncTask` | ✅ |
+| Free-space check (memory stats) | `MemoryStats.cs` | ✅ |
+| Push console settings (`cfg_*`) after sync | `hakchi.SyncConfig` | ✅ |
+| Per-console selected games (CE's SelectedGames / OriginalGames) | `ConfigIni` | ✅ |
+| Import from Console: binary-safe transfer, pick games from a list | `GameImporterForm.cs` | ✅ |
 | Compress / decompress games (7z) | `NesApplication.Compress` | ⬜ |
 
 ## Phase 3 — Library and UI
 
 | Feature | CE source | Status |
 |---|---|---|
-| Folders Manager (tree editor, auto-structure buttons, `folders*.htm`) | `FoldersManagerForm.cs` | ⬜ |
-| Selection presets | `MainForm` | ⬜ |
+| Folders Manager (tree editor, auto-structure buttons, `folders*.htm`) | `FoldersManagerForm.cs` | ✅ |
+| Selection presets | `MainForm` | ✅ |
 | View: original games position, sort by name/core/console/region, group without box art | `MainForm` | ⬜ |
 | Context menu: add/remove prefix, set region, archive `.clvg`, compress, delete box art, scan box art, repair games, show in Finder | `MainForm` | ⬜ |
 | Detail panel: sort name, copyright, region, save count, compress toggle, size, cover from file/paste/drop | `MainForm` | ⬜ |
@@ -55,11 +57,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Controller hacks (reset combo, autofire, X/Y autofire, Famicom start) | `ConfigIni.consoleSettings` | ⬜ |
-| Disable epilepsy protection, global extra command-line args | `ConfigIni` | ⬜ |
+| Controller hacks (reset combo, autofire, X/Y autofire, Famicom start) | `ConfigIni.consoleSettings` | ✅ |
+| Disable epilepsy protection, global extra command-line args | `ConfigIni` | ✅ |
 | Compress games / box art, center thumbnail, convert to SFROM, import scraper | `ConfigIni` | ⬜ |
-| SEGA UI theme (Mega Drive) | `MainForm` | ⬜ |
-| Save settings to mini now | `MainForm` | ⬜ |
+| SEGA UI theme (Mega Drive) | `MainForm` | ✅ |
+| Save settings to mini now | `MainForm` | ✅ |
 | hakchi + romfiles.xml update check | `MainForm` | ⬜ |
 
 ## Phase 5 — Tools

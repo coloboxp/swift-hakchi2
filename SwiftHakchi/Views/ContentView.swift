@@ -114,6 +114,7 @@ struct ContentView: View {
             Divider()
             StatusBarView()
         }
+        .modifier(SyncSheets())
         .sheet(isPresented: $appState.showInstallConfig) {
             InstallConfigSheet()
                 .environmentObject(appState)

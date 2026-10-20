@@ -20,6 +20,8 @@ final class SyncUIState: ObservableObject {
     @Published var foldersManagerPurpose: FoldersManagerPurpose?
     /// Last error or warnings of a sync, shown after the task sheet closes
     @Published var syncWarnings: [String] = []
+    /// Games found by "Import from Console" (non-nil shows the picker)
+    @Published var foundConsoleGames: [ConsoleGameImporter.FoundGame]?
 
     /// Codes whose stored selection was already applied this session
     var appliedSelectionCodes: Set<String> = []
@@ -205,6 +207,59 @@ extension AppState {
             MenuGame(code: game.code, name: game.name, sortName: game.sortName, isOriginal: game.isStock,
                      system: game.system, bin: DesktopFile.splitExec(game.commandLine).bin,
                      genre: game.genre, country: game.country)
+        }
+    }
+
+    // MARK: - Import from console (CE's GameImporterForm)
+
+    /// Scan the console, then show the list of games to import
+    func startConsoleImport() {
+        guard deviceManager.isConnected, let shell = deviceManager.sshService else { return }
+        let stockCodes = Set(gameManager.games.filter(\.isStock).map(\.id))
+        showTaskProgress = true
+        taskRunner.run(name: "Scanning console for games") { runner in
+            runner.updateProgress(status: "Looking for games...", fraction: 0.2)
+            let found = try await ConsoleGameImporter.findGames(shell: shell, stockCodes: stockCodes)
+            runner.updateProgress(status: found.isEmpty ? "No games found" : "Found \(found.count) game(s)", fraction: 1.0)
+            await MainActor.run {
+                if !found.isEmpty {
+                    self.showTaskProgress = false
+                    SyncUIState.shared.foundConsoleGames = found
+                }
+            }
+        }
+    }
+
+    /// Copy the chosen games into the library and select them for sync
+    func importConsoleGames(_ games: [ConsoleGameImporter.FoundGame]) {
+        guard let shell = deviceManager.sshService, !games.isEmpty else { return }
+        let gamesDir = AppConfig.shared.gamesDirectory
+        let codes = Set(games.map(\.code))
+        showTaskProgress = true
+        taskRunner.run(name: "Copying games from console") { [weak self] runner in
+            guard let self else { return }
+            var failed: [String] = []
+            for (i, game) in games.enumerated() {
+                try Task.checkCancellation()
+                runner.updateProgress(status: "\(game.name) (\(i + 1)/\(games.count))",
+                                      fraction: Double(i) / Double(games.count))
+                do {
+                    _ = try await ConsoleGameImporter.copy(game, shell: shell, gamesDirectory: gamesDir,
+                                                          cores: CoreCatalog.shared)
+                } catch {
+                    failed.append(game.name)
+                }
+            }
+            await MainActor.run {
+                self.gameManager.loadGames()
+                for i in self.gameManager.games.indices where codes.contains(self.gameManager.games[i].id) {
+                    self.gameManager.games[i].isSelected = true
+                    self.gameManager.games[i].isOnConsole = true
+                }
+            }
+            let summary = "Imported \(games.count - failed.count) game(s)"
+            runner.updateProgress(status: failed.isEmpty ? summary : summary + ". Failed: " + failed.joined(separator: ", "),
+                                  fraction: 1.0)
         }
     }
 }

@@ -36,12 +36,15 @@ struct SwiftHakchiApp: App {
             FileCommands(appState: appState)
             EditCommands(appState: appState)
             GameCommands(appState: appState)
+            StructureCommands(appState: appState)
             KernelCommands(appState: appState)
             ModulesCommands(appState: appState)
             ToolsCommands(appState: appState)
             HelpCommands(appState: appState)
-            CommandGroup(replacing: .toolbar) {}
-            CommandGroup(replacing: .sidebar) {}
+            Group {  // the commands builder takes at most 10 entries
+                CommandGroup(replacing: .toolbar) {}
+                CommandGroup(replacing: .sidebar) {}
+            }
         }
 
         Settings {
