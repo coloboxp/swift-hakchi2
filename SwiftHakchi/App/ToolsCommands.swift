@@ -61,17 +61,6 @@ struct ToolsCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Tools") {
-            Button("Select Emulation Core...") {
-                appState.openCoreDialog(for: appState.selectedGames)
-            }
-            .disabled(appState.selectedGames.allSatisfy { $0.source != .local })
-
-            Button("Scraper...") {
-                appState.showScraper = true
-            }
-
-            Divider()
-
             Button("Save-State Manager...") { openWindow(id: ToolWindow.saveStates.rawValue) }
                 .disabled(!connected)
             Button("Take Screenshot...") { openWindow(id: ToolWindow.screenshot.rawValue) }

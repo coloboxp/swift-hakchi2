@@ -5,64 +5,93 @@ import os
 
 private let logger = Logger(subsystem: "com.swifthakchi.app", category: "ModRepository")
 
-/// Fetches modules from a hakchi2-CE style repository (e.g., KMFD Mod Hub).
+/// Fetches items from a hakchi2-CE style repository, e.g. KMFD's Mod Hub
+/// (port of CE's `ModHub.Repository`).
 ///
 /// Repository layout (`<repo>/.repo/`):
 /// ```
 /// list                  # one item per line: "<name>.hmod" or "<name>.clvg"
-/// pack.tgz              # tar.gz of every item folder below, plus "list"
+/// readme.md             # repository welcome text
+/// pack.tgz              # tar.gz of "list", "readme.md" and every item folder below
 /// <item>/link           # download URL of the item
 /// <item>/md5, sha1      # checksums of the download (optional)
 /// <item>/readme.md      # front matter (Name, Category, Creator, Version...)
-/// <item>/extract        # present when the download is an archive
+/// <item>/extract        # present when the download is an archive to unpack
 /// ```
-/// Only `.hmod` items are returned; `.clvg` items are games, not modules.
+/// `.hmod` items are modules, `.clvg` items are games (hakchi game archives).
 actor ModRepositoryService {
-    /// A remote module available for download
+    /// What a repository item is
+    enum ItemKind: String, Sendable {
+        case hmod, game
+
+        var fileExtension: String { self == .hmod ? ".hmod" : ".clvg" }
+    }
+
+    /// An item available for download
     struct RemoteModule: Identifiable, Hashable, Sendable {
-        /// Package name as hakchi knows it (file name without ".hmod")
+        /// Item name without extension; for modules, the package name hakchi uses
         let id: String
+        let kind: ItemKind
         let name: String
         let category: String
         let creator: String
         let version: String
+        let emulatedSystem: String
         /// Download URL from the item's `link` file, if known yet
         let downloadURL: URL?
         let md5: String?
+        /// The download is an archive to unpack into a module folder (CE's `extract`)
+        let extract: Bool
+        let readme: HmodReadme?
         /// URL of the item folder inside `.repo/`
         let itemURL: URL
 
-        var fileName: String { id + ".hmod" }
+        var fileName: String { id + kind.fileExtension }
 
-        static func == (lhs: RemoteModule, rhs: RemoteModule) -> Bool { lhs.id == rhs.id }
-        func hash(into hasher: inout Hasher) { hasher.combine(id) }
+        static func == (lhs: RemoteModule, rhs: RemoteModule) -> Bool { lhs.id == rhs.id && lhs.kind == rhs.kind }
+        func hash(into hasher: inout Hasher) { hasher.combine(id); hasher.combine(kind) }
+    }
+
+    /// Everything a repository offers
+    struct Contents: Sendable {
+        var readme: String?
+        var items: [RemoteModule]
+
+        var modules: [RemoteModule] { items.filter { $0.kind == .hmod } }
+        var games: [RemoteModule] { items.filter { $0.kind == .game } }
     }
 
     /// How long a downloaded pack.tgz is reused before it is fetched again
     private static let packCacheLifetime: TimeInterval = 24 * 60 * 60
 
-    /// Fetch available modules from a repository URL.
+    /// Fetch a repository's items and welcome readme.
     /// Uses `pack.tgz` (full metadata in one request, cached on disk);
     /// falls back to the plain `list` file (names only) if the pack fails.
-    func fetchModules(from repositoryURL: String, forceRefresh: Bool = false) async throws -> [RemoteModule] {
+    func fetchRepository(from repositoryURL: String, forceRefresh: Bool = false) async throws -> Contents {
         let repoURL = try Self.normalizedRepoURL(repositoryURL)
 
         do {
             let pack = try await loadPack(repoURL: repoURL, forceRefresh: forceRefresh)
-            let modules = try Self.parsePack(pack, repoURL: repoURL)
-            if !modules.isEmpty { return modules }
+            let contents = try Self.parsePack(pack, repoURL: repoURL)
+            if !contents.items.isEmpty { return contents }
         } catch {
             logger.warning("pack.tgz failed (\(error.localizedDescription)), falling back to list")
         }
 
-        let listData = try await fetch(repoURL.appendingPathComponent("list"))
-        let list = String(decoding: listData, as: UTF8.self)
-        return Self.parseList(list).map { Self.makeModule(fileName: $0, files: [:], repoURL: repoURL) }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let list = String(decoding: try await fetch(repoURL.appendingPathComponent("list")), as: UTF8.self)
+        let readme = (try? await fetch(repoURL.appendingPathComponent("readme.md")))
+            .map { String(decoding: $0, as: UTF8.self) }
+        let items = Self.parseList(list).map { Self.makeItem(fileName: $0, files: [:], repoURL: repoURL) }
+        return Contents(readme: readme, items: Self.sorted(items))
     }
 
-    /// Download a module and verify its MD5 checksum when the repository provides one.
-    /// Returns the raw `.hmod` (tar.gz) data.
+    /// Modules only (kept for callers that don't need games or the readme)
+    func fetchModules(from repositoryURL: String, forceRefresh: Bool = false) async throws -> [RemoteModule] {
+        try await fetchRepository(from: repositoryURL, forceRefresh: forceRefresh).modules
+    }
+
+    /// Download an item and verify its MD5 checksum when the repository provides one.
+    /// Returns the raw download (a tar.gz `.hmod`/`.clvg`, or an archive when `extract` is set).
     func downloadModule(_ module: RemoteModule) async throws -> Data {
         var url = module.downloadURL
         if url == nil {
@@ -72,7 +101,7 @@ actor ModRepositoryService {
         }
         guard let url else { throw ModRepositoryError.missingLink(module.name) }
 
-        logger.info("Downloading module \(module.id) from \(url.absoluteString)")
+        logger.info("Downloading \(module.fileName) from \(url.absoluteString)")
         let data = try await fetch(url)
 
         if let expected = module.md5?.lowercased(), !expected.isEmpty {
@@ -82,11 +111,15 @@ actor ModRepositoryService {
             }
         }
 
-        // hakchi's pack_install only understands tar.gz files
-        guard data.count > 2, data[data.startIndex] == 0x1F, data[data.startIndex + 1] == 0x8B else {
+        // Without "extract", the download must be a packed module/game (tar.gz)
+        if !module.extract, !Self.isGzip(data) {
             throw ModRepositoryError.unsupportedFormat(module.name)
         }
         return data
+    }
+
+    static func isGzip(_ data: Data) -> Bool {
+        data.count > 2 && data[data.startIndex] == 0x1F && data[data.startIndex + 1] == 0x8B
     }
 
     // MARK: - Networking
@@ -102,7 +135,7 @@ actor ModRepositoryService {
 
     /// Download pack.tgz, or reuse a recent copy from the data directory.
     private func loadPack(repoURL: URL, forceRefresh: Bool) async throws -> Data {
-        let cacheDir = AppConfig.shared.dataDirectory.appendingPathComponent("modhub", isDirectory: true)
+        let cacheDir = AppConfig.configDirectory.appendingPathComponent("data/modhub", isDirectory: true)
         let key = Insecure.MD5.hash(data: Data(repoURL.absoluteString.utf8))
             .map { String(format: "%02x", $0) }.joined()
         let cacheFile = cacheDir.appendingPathComponent("\(key).tgz")
@@ -134,19 +167,28 @@ actor ModRepositoryService {
         return url
     }
 
+    /// Item names from the `list` file (`.hmod` and `.clvg` only)
     static func parseList(_ text: String) -> [String] {
         text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { $0.lowercased().hasSuffix(".hmod") }
+            .filter { kind(ofFileName: $0) != nil }
+    }
+
+    static func kind(ofFileName name: String) -> ItemKind? {
+        let lower = name.lowercased()
+        if lower.hasSuffix(".hmod") { return .hmod }
+        if lower.hasSuffix(".clvg") { return .game }
+        return nil
     }
 
     /// Parse pack.tgz: group "<item>/<file>" entries by item folder.
-    static func parsePack(_ data: Data, repoURL: URL) throws -> [RemoteModule] {
+    static func parsePack(_ data: Data, repoURL: URL) throws -> Contents {
         let tar = try GzipArchive.unarchive(archive: data)
         let entries = try TarContainer.open(container: tar)
 
         var items: [String: [String: String]] = [:]
         var list: [String]?
+        var readme: String?
         let wanted: Set<String> = ["link", "md5", "extract", "readme.md", "readme.txt", "readme"]
 
         for entry in entries {
@@ -154,56 +196,57 @@ actor ModRepositoryService {
             if path.hasPrefix("./") { path.removeFirst(2) }
             let parts = path.split(separator: "/", omittingEmptySubsequences: true)
 
-            if parts.count == 1, parts[0].lowercased() == "list", let d = entry.data {
-                list = parseList(String(decoding: d, as: UTF8.self))
+            if parts.count == 1, let d = entry.data {
+                switch parts[0].lowercased() {
+                case "list": list = parseList(String(decoding: d, as: UTF8.self))
+                case "readme.md": readme = String(decoding: d, as: UTF8.self)
+                default: break
+                }
             }
             guard parts.count == 2 else { continue }
             let item = String(parts[0]), file = parts[1].lowercased()
-            guard item.lowercased().hasSuffix(".hmod"), wanted.contains(file) else { continue }
+            guard kind(ofFileName: item) != nil, wanted.contains(file) else { continue }
             items[item, default: [:]][file] = entry.data.map { String(decoding: $0, as: UTF8.self) } ?? ""
         }
 
         // The list is authoritative when present (pack may contain stale folders)
         let names = list.map { l in l.filter { items[$0] != nil } } ?? Array(items.keys)
-        return names.map { makeModule(fileName: $0, files: items[$0] ?? [:], repoURL: repoURL) }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let parsed = names.map { makeItem(fileName: $0, files: items[$0] ?? [:], repoURL: repoURL) }
+        return Contents(readme: readme, items: sorted(parsed))
     }
 
-    private static func makeModule(fileName: String, files: [String: String], repoURL: URL) -> RemoteModule {
-        let id = String(fileName.dropLast(".hmod".count))
-        let readme = files["readme.md"] ?? files["readme.txt"] ?? files["readme"] ?? ""
-        let meta = parseFrontMatter(readme)
+    private static func makeItem(fileName: String, files: [String: String], repoURL: URL) -> RemoteModule {
+        let kind = kind(ofFileName: fileName) ?? .hmod
+        let id = String(fileName.dropLast(kind.fileExtension.count))
+        let readmeFile = HmodReadme.fileNames.first { files[$0] != nil }
+        let readme = readmeFile.map { HmodReadme(files[$0] ?? "", isMarkdown: $0.hasSuffix(".md")) }
         let trimmed = { (s: String?) -> String? in
             guard let s = s?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
             return s
         }
         return RemoteModule(
             id: id,
-            name: meta["Name"] ?? cleanModuleName(id),
-            category: meta["Category"] ?? "Other",
-            creator: meta["Creator"] ?? "",
-            version: meta["Version"] ?? "",
+            kind: kind,
+            name: readme?.name ?? cleanModuleName(id),
+            category: readme?.category ?? (kind == .game ? "Games" : "Other"),
+            creator: readme?.creator ?? "",
+            version: readme?.version ?? "",
+            emulatedSystem: readme?.emulatedSystem ?? "",
             downloadURL: trimmed(files["link"]).flatMap(URL.init(string:)),
             md5: trimmed(files["md5"]),
+            extract: files["extract"] != nil,
+            readme: readme,
             itemURL: repoURL.appendingPathComponent(fileName, isDirectory: true)
         )
     }
 
-    /// Parse the "Key: Value" block between the leading "-----" lines of a readme.
+    /// Kept for callers that parse front matter directly
     static func parseFrontMatter(_ readme: String) -> [String: String] {
-        let lines = readme.components(separatedBy: .newlines)
-        guard let first = lines.firstIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }),
-              lines[first].hasPrefix("---") else { return [:] }
+        Dictionary(HmodReadme(readme).frontMatter.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
+    }
 
-        var result: [String: String] = [:]
-        for line in lines[(first + 1)...] {
-            if line.hasPrefix("---") { break }
-            guard let colon = line.firstIndex(of: ":") else { continue }
-            let key = line[..<colon].trimmingCharacters(in: .whitespaces)
-            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
-            if !key.isEmpty, !value.isEmpty { result[key] = value }
-        }
-        return result
+    private static func sorted(_ items: [RemoteModule]) -> [RemoteModule] {
+        items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// Fallback display name: "_km_snes9x_xtreme" → "Km snes9x xtreme"

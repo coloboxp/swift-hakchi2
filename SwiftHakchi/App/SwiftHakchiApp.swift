@@ -39,7 +39,10 @@ struct SwiftHakchiApp: App {
             KernelCommands(appState: appState)
             ModulesCommands(appState: appState)
             ToolsCommands(appState: appState)
-            HelpCommands(appState: appState)
+            Group {
+                HelpCommands(appState: appState)
+                LibraryCommands(appState: appState, settings: LibrarySettings.shared)
+            }
             CommandGroup(replacing: .toolbar) {}
             CommandGroup(replacing: .sidebar) {}
         }
@@ -152,19 +155,6 @@ struct GameCommands: Commands {
             }
             .keyboardShortcut("d")
             .disabled(appState.selectedGame == nil || !appState.deviceManager.isConnected)
-        }
-    }
-}
-
-struct ModulesCommands: Commands {
-    @ObservedObject var appState: AppState
-
-    var body: some Commands {
-        CommandMenu("Modules") {
-            Button("Module Manager...") {
-                appState.showModuleManager = true
-            }
-            .keyboardShortcut("m", modifiers: [.command, .shift])
         }
     }
 }

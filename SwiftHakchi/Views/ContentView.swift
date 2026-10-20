@@ -149,10 +149,12 @@ struct ContentView: View {
             SelectCoreView(gameIds: appState.coreDialogGameIds ?? [])
                 .environmentObject(appState)
         }
+        .modifier(LibrarySheets())
         .sheet(isPresented: $appState.showModuleManager) {
             ModuleManagerView()
                 .environmentObject(appState)
         }
+        .modifier(ModuleSheets(appState: appState))
         .sheet(isPresented: $appState.showHelp) {
             HelpView()
         }

@@ -32,6 +32,15 @@ let package = Package(
             ]
         ),
         .target(
+            name: "LzmaSDK",
+            path: "vendor/lzma",
+            sources: ["src/"],
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("Z7_ST"),
+            ]
+        ),
+        .target(
             name: "USBBridge",
             dependencies: ["LibSSH2"],
             path: "USBBridge",
@@ -46,6 +55,7 @@ let package = Package(
             name: "SwiftHakchi",
             dependencies: [
                 "USBBridge",
+                "LzmaSDK",
                 .product(name: "SWCompression", package: "SWCompression"),
             ],
             path: "SwiftHakchi",
@@ -60,6 +70,11 @@ let package = Package(
                 .copy("Resources/blankBoot.png"),
                 .copy("Resources/splash.gz"),
                 .copy("Resources/tools"),
+                .copy("Resources/BlankCovers"),
+                .copy("Resources/SpineTemplates"),
+                .copy("Resources/GameGenieDB.xml"),
+                .copy("Resources/desktop_entries.tar"),
+                .copy("Resources/original_art.tar"),
             ],
             linkerSettings: [
                 .linkedFramework("IOKit"),

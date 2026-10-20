@@ -58,6 +58,13 @@ final class AppState: ObservableObject {
     var selectionAnchorId: String?
     /// Games shown in the "Select emulation core" sheet (nil = sheet closed)
     @Published var coreDialogGameIds: [String]?
+    // Library sheets (AppState+LibraryActions.swift)
+    @Published var scraperQueue: [String] = []
+    @Published var coverChoices: [CoverChoice] = []
+    @Published var showNewCustomApp = false
+    @Published var showPrepareArtFolders = false
+    @Published var gameGenieGameId: String?
+    @Published var spineGameId: String?
     @Published var searchText = ""
     @Published var showScraper = false
     @Published var showModuleManager = false
@@ -78,6 +85,9 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        // Load library settings first: "Separate games storage" decides the games folder
+        _ = LibrarySettings.shared
+
         // Forward objectWillChange from nested ObservableObjects
         deviceManager.objectWillChange
             .receive(on: DispatchQueue.main)
@@ -104,6 +114,7 @@ final class AppState: ObservableObject {
                     Task { await self.onConsoleConnected() }
                 } else {
                     self.gameManager.clearConsoleGames()
+                    BluetoothState.shared.isAvailable = false
                 }
             }
             .store(in: &cancellables)
@@ -129,9 +140,9 @@ final class AppState: ObservableObject {
             .removeDuplicates()
             .dropFirst()
             .filter { !$0.isEmpty }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.enrichLibrary()
+            .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
+            .sink { [weak self] key in
+                self?.enrichLibraryIfKeyValid(key)
             }
             .store(in: &cancellables)
 
@@ -167,6 +178,7 @@ final class AppState: ObservableObject {
         } catch {
             logger.warning("Core refresh failed: \(error.localizedDescription)")
         }
+        await BluetoothState.shared.check(shell: shell)  // shows the Bluetooth menu item
         await gameManager.pullGamesFromConsole(shell: shell, consoleType: consoleType, deviceId: deviceId)
         gameManager.matchExistingGames()
         statusMessage = nil

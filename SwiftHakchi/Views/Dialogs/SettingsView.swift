@@ -19,12 +19,15 @@ struct SettingsView: View {
                     Label("Storage", systemImage: "externaldrive")
                 }
 
+            LibrarySettingsTab()
+                .tabItem { Label("Library", systemImage: "books.vertical") }
+
             advancedTab
                 .tabItem {
                     Label("Advanced", systemImage: "gearshape.2")
                 }
         }
-        .frame(width: 450, height: 300)
+        .frame(width: 520, height: 460)
         .onChange(of: config.lastConsoleType) { _, _ in config.save() }
         .onChange(of: config.separateGameStorage) { _, _ in config.save() }
         .onChange(of: config.uploadCompressed) { _, _ in config.save() }

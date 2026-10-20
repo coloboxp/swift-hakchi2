@@ -32,7 +32,8 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Linked sync (`.storage`) on/off, always copy original games | `SyncTask` | ⬜ |
 | Free-space check (memory stats) | `MemoryStats.cs` | ⬜ |
 | Push console settings (`cfg_*`) after sync | `hakchi.SyncConfig` | ⬜ |
-| Compress / decompress games (7z) | `NesApplication.Compress` | ⬜ |
+| Compress / decompress games (7z): `GameCompression` + LZMA 7z writer (vendored LZMA SDK) | `NesApplication.Compress` | ✅ |
+| Compress / decompress from the library UI and the "Compress games when adding" setting | `MainForm`, `ConfigIni.Compress` | ⬜ |
 
 ## Phase 3 — Library and UI
 
@@ -40,16 +41,20 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 |---|---|---|
 | Folders Manager (tree editor, auto-structure buttons, `folders*.htm`) | `FoldersManagerForm.cs` | ⬜ |
 | Selection presets | `MainForm` | ⬜ |
-| View: original games position, sort by name/core/console/region, group without box art | `MainForm` | ⬜ |
-| Context menu: add/remove prefix, set region, archive `.clvg`, compress, delete box art, scan box art, repair games, show in Finder | `MainForm` | ⬜ |
-| Detail panel: sort name, copyright, region, save count, compress toggle, size, cover from file/paste/drop | `MainForm` | ⬜ |
-| Add custom app | `NewCustomGameForm.cs` | ⬜ |
-| Restore original games | `MainForm` | ⬜ |
-| Cover matching from local `art/` folder, prepare art folders | `NesApplication.FindCover`, `SelectSystemDialog` | ⬜ |
+| View: original games position, sort by name/core/console/region, group without box art | `MainForm` | ✅ (original games default to Hidden, they already have their own tab) |
+| Context menu: add/remove prefix, set region, scrape selected, archive `.clvg`, compress/decompress, delete box art, scan box art, repair games, show in Finder | `MainForm` | ✅ |
+| Detail panel: sort name, copyright, max players, genre list, region, save count, compress toggle, ID/size, cover from file/paste/drop, autosave | `MainForm` | ✅ |
+| Add custom app | `NewCustomGameForm.cs` | ✅ |
+| Restore original games (bundled `desktop_entries.tar`) | `MainForm` | ✅ |
+| Cover matching (CRC, MD Mini art, sibling image, fuzzy), Select cover dialog, prepare art folders, blank covers, 8-bit box art | `NesApplication.FindCover`, `SelectCoverDialog`, `SelectSystemDialog` | ✅ |
 | IPS patches | `NesApplication.FindPatch` | ✅ |
 | NES iNES checks, FDS header strip, SNES → SFROM conversion | `NesGame`, `FdsGame`, `SnesGame` | ✅ |
-| Separate local game storage per console family | `ConfigIni.SeparateGameLocalStorage` | ⬜ |
-| Game Genie codes | `GameGenie*` (disabled in CE) | ⬜ |
+| Separate local game storage per console family | `ConfigIni.SeparateGameLocalStorage` | ✅ |
+| Mega Drive Mini art (`CODE_mdmini.png`) and spine generator with templates | `SetMdMini`, `SpineForm` | ✅ |
+| Drag and drop: images (cover), games, `.hmod`/archives (module library), `.hrepo` | `MainForm.dragDrop` | ✅ |
+| Keyboard: ⌘A, Esc, Space, Delete in the explorer | `MainForm` | ✅ |
+| TheGamesDB fixes: genre names, publisher names, debounced key check | `ScraperForm` | ✅ |
+| Game Genie codes: database, per-game `gamegenie.txt`, NES/SNES patchers (`GameGenie.patchedRom`, used by sync) | `GameGenie*` | ✅ |
 
 ## Phase 4 — Settings
 
@@ -57,7 +62,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 |---|---|---|
 | Controller hacks (reset combo, autofire, X/Y autofire, Famicom start) | `ConfigIni.consoleSettings` | ⬜ |
 | Disable epilepsy protection, global extra command-line args | `ConfigIni` | ⬜ |
-| Compress games / box art, center thumbnail, convert to SFROM, import scraper | `ConfigIni` | ⬜ |
+| Compress games / box art, center thumbnail, convert to SFROM, import scraper, disable pop-ups | `ConfigIni` | ✅ |
 | SEGA UI theme (Mega Drive) | `MainForm` | ⬜ |
 | Save settings to mini now | `MainForm` | ⬜ |
 | hakchi + romfiles.xml update check | `MainForm` | ⬜ |
@@ -100,13 +105,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Mod Hub browse + install | `ModHub/` | ✅ |
-| Local module library (`user_mods/`), install from library | `Hmod/SelectForm` | ⬜ |
+| Mod Hub browse + install (Welcome readme, category pages, Download vs Download and install, `extract`) | `ModHub/` | ✅ |
+| Multiple repositories (Modules menu item per repository) | `MainForm.populateRepos` | ✅ |
+| Local module library (`user_mods/`): files/folders, readme front matter, group by, delete, add/drop, archives with modules | `Hmod/SelectForm`, `Hmod.cs` | ✅ |
+| Install extra modules from the library (staged, applied on reboot) | `ModTasks` | ✅ |
 | Uninstall modules | `ModTasks` | ✅ |
-| Repository manager (add/edit/delete/reorder, `.hrepo` drop) | `RepoManagementForm.cs` | ⬜ |
-| Mod Hub games tab (`.clvg`) | `ModHub/` | ⬜ |
-| Modules report (HTML) | `MainForm` | ⬜ |
-| Bluetooth controller pairing | `Wireless/Bluetooth` | ⬜ |
+| Repository manager (add/edit/delete/reorder, `.hrepo` drop and import) | `RepoManagementForm.cs` | ✅ |
+| Mod Hub games tab (`.clvg` download + import) | `ModHub/` | ✅ |
+| Modules report (HTML, CE template) | `MainForm` | ✅ |
+| Bluetooth controller pairing (via `bluetoothctl` over SSH; CE uses TCP port 787) | `Wireless/Bluetooth` | ✅ |
 
 ## Not ported
 
