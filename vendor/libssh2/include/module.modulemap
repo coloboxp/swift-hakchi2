@@ -1,0 +1,9 @@
+// Explicit module map. Without it, SwiftPM generates an umbrella header named
+// after the target ("LibSSH2.h"), which collides case-insensitively with
+// libssh2.h and triggers -Wnonportable-include-path / -Wincomplete-umbrella.
+module LibSSH2 {
+    header "libssh2.h"
+    header "libssh2_publickey.h"
+    header "libssh2_sftp.h"
+    export *
+}

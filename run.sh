@@ -7,6 +7,8 @@ cd "$(dirname "$0")"
 pkill -f "Swift Hakchi2.app" 2>/dev/null || true
 sleep 1
 
+source scripts/select-sdk.sh
+
 # Build
 swift build
 

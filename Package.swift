@@ -63,5 +63,13 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
+        .testTarget(
+            name: "SwiftHakchiTests",
+            dependencies: [
+                "SwiftHakchi",
+                .product(name: "SWCompression", package: "SWCompression"),
+            ],
+            path: "Tests/SwiftHakchiTests"
+        ),
     ]
 )

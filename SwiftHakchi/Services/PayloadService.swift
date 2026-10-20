@@ -4,9 +4,12 @@ import SWCompression
 /// Loads and caches binary payloads needed for FEL boot:
 /// fes1.bin (DRAM init SPL), uboot.bin (U-Boot), boot.img (kernel)
 /// These are extracted from hakchi.hmod (a tar.gz archive).
-final class PayloadService {
+/// Thread-safe: flash tasks load payloads from background tasks.
+final class PayloadService: @unchecked Sendable {
     static let shared = PayloadService()
 
+    /// Guards the cached* properties below
+    private let lock = NSLock()
     private var cachedFes1: Data?
     private var cachedUboot: Data?
     private var cachedBootImg: Data?
@@ -15,63 +18,71 @@ final class PayloadService {
 
     private init() {}
 
+    /// Return the cached value in `slot`, or load it and cache it.
+    /// The lock is not held while loading, so loaders may call other accessors.
+    private func cached(_ slot: ReferenceWritableKeyPath<PayloadService, Data?>,
+                        load: () throws -> Data) rethrows -> Data {
+        if let data = lock.withLock({ self[keyPath: slot] }) { return data }
+        let data = try load()
+        lock.withLock { self[keyPath: slot] = data }
+        return data
+    }
+
     /// fes1.bin — Allwinner DRAM init SPL, loaded from bundled resource
     func fes1() throws -> Data {
-        if let cached = cachedFes1 { return cached }
-        let data = try loadBundledResource("fes1", ext: "bin")
-        cachedFes1 = data
-        print("[Payload] fes1.bin: \(data.count) bytes")
-        return data
+        try cached(\.cachedFes1) {
+            let data = try loadBundledResource("fes1", ext: "bin")
+            print("[Payload] fes1.bin: \(data.count) bytes")
+            return data
+        }
     }
 
     /// uboot.bin — U-Boot binary, extracted from hakchi.hmod
     func uboot() throws -> Data {
-        if let cached = cachedUboot { return cached }
-        let data = try extractFromHmod(path: "boot/uboot.bin")
-        cachedUboot = data
-        print("[Payload] uboot.bin: \(data.count) bytes")
-        return data
+        try cached(\.cachedUboot) {
+            let data = try extractFromHmod(path: "boot/uboot.bin")
+            print("[Payload] uboot.bin: \(data.count) bytes")
+            return data
+        }
     }
 
     /// boot.img — Stock kernel image from hakchi.hmod.
     /// FELService patches the cmdline to add "hakchi-shell" which starts the
     /// RNDIS gadget. Same boot.img as the upstream Windows client uses.
     func bootImg() throws -> Data {
-        if let cached = cachedBootImg { return cached }
-        let data = try extractFromHmod(path: "boot/boot.img")
-        cachedBootImg = data
-        print("[Payload] boot.img (from hmod): \(data.count) bytes")
-        return data
+        try cached(\.cachedBootImg) {
+            let data = try extractFromHmod(path: "boot/boot.img")
+            print("[Payload] boot.img (from hmod): \(data.count) bytes")
+            return data
+        }
     }
 
     /// basehmods.tar — Bundle of base hmods to install
     func baseHmods() throws -> Data {
-        if let cached = cachedBaseHmods { return cached }
-        let data = try loadBundledResource("basehmods", ext: "tar")
-        cachedBaseHmods = data
-        print("[Payload] basehmods.tar: \(data.count) bytes")
-        return data
+        try cached(\.cachedBaseHmods) {
+            let data = try loadBundledResource("basehmods", ext: "tar")
+            print("[Payload] basehmods.tar: \(data.count) bytes")
+            return data
+        }
     }
 
     /// hakchi.hmod — The full hmod archive
     func hakchiHmod() throws -> Data {
-        if let cached = cachedHakchiHmod { return cached }
+        try cached(\.cachedHakchiHmod) {
+            // Try cached download first
+            let cachedPath = AppConfig.shared.dataDirectory
+                .appendingPathComponent("hakchi-latest.hmod")
+            if FileManager.default.fileExists(atPath: cachedPath.path),
+               let data = try? Data(contentsOf: cachedPath), !data.isEmpty {
+                print("[Payload] hakchi.hmod (cached): \(data.count) bytes")
+                return data
+            }
 
-        // Try cached download first
-        let cachedPath = AppConfig.shared.dataDirectory
-            .appendingPathComponent("hakchi-latest.hmod")
-        if FileManager.default.fileExists(atPath: cachedPath.path),
-           let data = try? Data(contentsOf: cachedPath), !data.isEmpty {
-            cachedHakchiHmod = data
-            print("[Payload] hakchi.hmod (cached): \(data.count) bytes")
+            // Fall back to bundled
+            let data = try loadBundledResource("hakchi", ext: "hmod")
+            print("[Payload] hakchi.hmod (bundled): \(data.count) bytes")
             return data
         }
-
-        // Fall back to bundled
-        let data = try loadBundledResource("hakchi", ext: "hmod")
-        cachedHakchiHmod = data
-        print("[Payload] hakchi.hmod (bundled): \(data.count) bytes")
-        return data
     }
 
     /// Extract a file from the hakchi.hmod tar.gz archive
