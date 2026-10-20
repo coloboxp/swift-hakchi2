@@ -86,7 +86,8 @@ actor FlashService {
                                    progress: progress, startProgress: 0.45)
     }
 
-    private func continueInstall(
+    /// Config flags, base hmods + hakchi.hmod transfer, then `boot` (shared with RecoveryService's reset)
+    func continueInstall(
         shell: SSHService,
         baseHmods: Data, hakchiHmod: Data, bootImg: Data,
         progress: @Sendable (String, Double) -> Void,
@@ -243,20 +244,34 @@ actor FlashService {
 
     // MARK: - Dump Stock Kernel (standalone)
 
+    /// Dump the stock kernel over the already connected session. A second
+    /// RNDIS session can't be opened while DeviceManager holds one, so only
+    /// connect a new session when none is given.
     func dumpStockKernel(
+        shell existing: SSHService?,
         progress: @Sendable (String, Double) -> Void
     ) async throws {
-        let shell = SSHService()
-        do {
-            try await shell.connect()
-        } catch {
-            throw FlashError.notConnected
+        let shell: SSHService
+        if let existing {
+            shell = existing
+        } else {
+            shell = SSHService()
+            do {
+                try await shell.connect()
+            } catch {
+                throw FlashError.notConnected
+            }
         }
 
         progress("Reading stock kernel...", 0.3)
         let backupPath = try await dumpStockKernel(shell: shell)
-        await shell.disconnect()
+        if existing == nil { await shell.disconnect() }
         progress("Kernel backup saved to \(backupPath.lastPathComponent)!", 1.0)
+    }
+
+    /// Wait for the console's shell after a memboot (used by RecoveryService)
+    func waitForRecoveryShell(timeout: TimeInterval) async throws -> SSHService {
+        try await waitForSSH(timeout: timeout)
     }
 
     // MARK: - Helpers

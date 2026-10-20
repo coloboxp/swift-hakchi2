@@ -423,6 +423,221 @@ int ssh_exec_stdin(ssh_session_t *s, const char *command,
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Streaming exec (large downloads/uploads)
+// ---------------------------------------------------------------------------
+
+int ssh_exec_stream(ssh_session_t *s, const char *command,
+                    const uint8_t *stdin_data, uint64_t stdin_len,
+                    ssh_stream_cb out_cb, ssh_progress_cb progress_cb, void *ctx,
+                    ssh_exec_result_t *result, int idle_timeout_ms) {
+    if (!s || !s->ssh || !result) return -1;
+    memset(result, 0, sizeof(*result));
+
+    fprintf(stderr, "[SSH] exec_stream: '%s' (%llu bytes stdin)\n",
+            command, (unsigned long long)stdin_len);
+    libssh2_session_set_timeout(s->ssh, idle_timeout_ms);
+
+    LIBSSH2_CHANNEL *ch = libssh2_channel_open_session(s->ssh);
+    if (!ch) {
+        fprintf(stderr, "[SSH] exec_stream: failed to open channel\n");
+        return -1;
+    }
+    if (libssh2_channel_exec(ch, command) != 0) {
+        fprintf(stderr, "[SSH] exec_stream: exec failed\n");
+        libssh2_channel_free(ch);
+        return -1;
+    }
+
+
+    size_t stderr_cap = 4096, stderr_len = 0;
+    char *stderr_buf = malloc(stderr_cap);
+    char tmp[16384];
+    uint64_t written = 0;
+    int eof_sent = (stdin_data == NULL || stdin_len == 0);
+    int aborted = 0;
+    int ret = 0;
+    uint64_t idle_deadline = now_ms_ssh() + (uint64_t)idle_timeout_ms;
+
+    int stdin_done = eof_sent;
+    if (eof_sent) libssh2_channel_send_eof(ch);  // still blocking here
+
+    // Non-blocking loop: interleave stdin writes with stdout/stderr reads so a
+    // command that produces output while consuming input cannot deadlock.
+    libssh2_session_set_blocking(s->ssh, 0);
+    s->recv_timeout_ms = 50;
+
+    for (;;) {
+        int moved = 0;
+
+        if (stdin_done && !eof_sent) {
+            // send_eof may report EAGAIN in non-blocking mode; retry until it goes out
+            int rc = libssh2_channel_send_eof(ch);
+            if (rc == 0) eof_sent = 1;
+            else if (rc != LIBSSH2_ERROR_EAGAIN) eof_sent = 1;
+        }
+
+        if (!stdin_done) {
+            uint64_t left = stdin_len - written;
+            size_t chunk = left > 32768 ? 32768 : (size_t)left;
+            ssize_t n = libssh2_channel_write(ch, (const char *)(stdin_data + written), chunk);
+            if (n > 0) {
+                written += (uint64_t)n;
+                moved = 1;
+                if (progress_cb) progress_cb(written, stdin_len, ctx);
+            } else if (n != LIBSSH2_ERROR_EAGAIN) {
+                fprintf(stderr, "[SSH] exec_stream: write error %zd at %llu\n",
+                        n, (unsigned long long)written);
+                ret = -1;
+                break;
+            }
+            if (written == stdin_len) stdin_done = 1;
+        }
+
+        ssize_t n = libssh2_channel_read(ch, tmp, sizeof(tmp));
+        if (n > 0) {
+            moved = 1;
+            if (out_cb && !out_cb((const uint8_t *)tmp, (uint32_t)n, ctx)) {
+                aborted = 1;
+                break;
+            }
+        }
+
+        n = libssh2_channel_read_stderr(ch, tmp, sizeof(tmp));
+        if (n > 0) {
+            if (stderr_len + (size_t)n > stderr_cap) {
+                stderr_cap = (stderr_len + (size_t)n) * 2;
+                stderr_buf = realloc(stderr_buf, stderr_cap);
+            }
+            memcpy(stderr_buf + stderr_len, tmp, (size_t)n);
+            stderr_len += (size_t)n;
+            moved = 1;
+        }
+
+        if (eof_sent && libssh2_channel_eof(ch)) break;
+
+        if (moved) {
+            idle_deadline = now_ms_ssh() + (uint64_t)idle_timeout_ms;
+        } else {
+            if (now_ms_ssh() > idle_deadline) {
+                fprintf(stderr, "[SSH] exec_stream: idle timeout\n");
+                ret = -1;
+                break;
+            }
+            tcp_poll(s->tcp, 50);
+        }
+    }
+
+    s->recv_timeout_ms = 30000;
+    libssh2_session_set_blocking(s->ssh, 1);
+    libssh2_session_set_timeout(s->ssh, 30000);
+
+    stderr_buf = realloc(stderr_buf, stderr_len + 1);
+    stderr_buf[stderr_len] = '\0';
+    result->stderr_buf = stderr_buf;
+    result->stderr_len = (uint32_t)stderr_len;
+    result->exit_code = aborted ? -1 : libssh2_channel_get_exit_status(ch);
+
+    libssh2_channel_close(ch);
+    libssh2_channel_free(ch);
+
+    return aborted ? -2 : ret;
+}
+
+// ---------------------------------------------------------------------------
+// Interactive shell
+// ---------------------------------------------------------------------------
+
+struct ssh_shell {
+    ssh_session_t   *session;
+    LIBSSH2_CHANNEL *ch;
+};
+
+ssh_shell_t *ssh_shell_open(ssh_session_t *s, int cols, int rows) {
+    if (!s || !s->ssh) return NULL;
+
+    LIBSSH2_CHANNEL *ch = libssh2_channel_open_session(s->ssh);
+    if (!ch) {
+        fprintf(stderr, "[SSH] shell: failed to open channel\n");
+        return NULL;
+    }
+    if (libssh2_channel_request_pty_ex(ch, "vt100", 5, NULL, 0, cols, rows, 0, 0) != 0) {
+        fprintf(stderr, "[SSH] shell: PTY request failed\n");
+        libssh2_channel_free(ch);
+        return NULL;
+    }
+    if (libssh2_channel_shell(ch) != 0) {
+        fprintf(stderr, "[SSH] shell: shell request failed\n");
+        libssh2_channel_free(ch);
+        return NULL;
+    }
+
+    ssh_shell_t *sh = calloc(1, sizeof(ssh_shell_t));
+    sh->session = s;
+    sh->ch = ch;
+    fprintf(stderr, "[SSH] shell: opened (%dx%d)\n", cols, rows);
+    return sh;
+}
+
+int ssh_shell_read(ssh_shell_t *sh, uint8_t *buf, uint32_t cap, int timeout_ms) {
+    if (!sh || !sh->ch || !buf || cap == 0) return -1;
+    ssh_session_t *s = sh->session;
+
+    libssh2_session_set_blocking(s->ssh, 0);
+    s->recv_timeout_ms = 20;
+
+    int total = 0;
+    uint64_t deadline = now_ms_ssh() + (uint64_t)(timeout_ms > 0 ? timeout_ms : 0);
+    for (;;) {
+        ssize_t n = libssh2_channel_read(sh->ch, (char *)buf + total, cap - (uint32_t)total);
+        if (n > 0) total += (int)n;
+        if ((uint32_t)total < cap) {
+            n = libssh2_channel_read_stderr(sh->ch, (char *)buf + total, cap - (uint32_t)total);
+            if (n > 0) total += (int)n;
+        }
+        if (total > 0 || (uint32_t)total >= cap) break;
+        if (libssh2_channel_eof(sh->ch)) {
+            total = -1;
+            break;
+        }
+        if (now_ms_ssh() >= deadline) break;
+        tcp_poll(s->tcp, 20);
+    }
+
+    s->recv_timeout_ms = 30000;
+    libssh2_session_set_blocking(s->ssh, 1);
+    return total;
+}
+
+int ssh_shell_write(ssh_shell_t *sh, const uint8_t *data, uint32_t len) {
+    if (!sh || !sh->ch) return -1;
+    ssh_session_t *s = sh->session;
+    s->recv_timeout_ms = 50;
+    uint32_t written = 0;
+    while (written < len) {
+        ssize_t n = libssh2_channel_write(sh->ch, (const char *)data + written, len - written);
+        if (n <= 0) break;
+        written += (uint32_t)n;
+    }
+    s->recv_timeout_ms = 30000;
+    return (int)written;
+}
+
+int ssh_shell_resize(ssh_shell_t *sh, int cols, int rows) {
+    if (!sh || !sh->ch) return -1;
+    return libssh2_channel_request_pty_size(sh->ch, cols, rows);
+}
+
+void ssh_shell_close(ssh_shell_t *sh) {
+    if (!sh) return;
+    if (sh->ch) {
+        libssh2_channel_close(sh->ch);
+        libssh2_channel_free(sh->ch);
+    }
+    free(sh);
+    fprintf(stderr, "[SSH] shell: closed\n");
+}
+
 void ssh_result_free(ssh_exec_result_t *result) {
     if (!result) return;
     free(result->stdout_buf);

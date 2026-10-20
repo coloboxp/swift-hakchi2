@@ -388,10 +388,11 @@ final class AppState: ObservableObject {
             }
 
         case .dumpStockKernel:
+            let shell = deviceManager.sshService
             taskRunner.run(name: "Dumping stock kernel") { [weak self] runner in
                 guard let self else { return }
                 defer { Task { @MainActor in self.deviceManager.suppressAutoConnect = false } }
-                try await flashService.dumpStockKernel { status, progress in
+                try await flashService.dumpStockKernel(shell: shell) { status, progress in
                     runner.updateProgress(status: status, fraction: progress)
                 }
             }

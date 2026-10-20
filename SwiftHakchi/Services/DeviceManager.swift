@@ -24,6 +24,8 @@ final class DeviceManager: ObservableObject {
     @Published var customFirmwareLoaded: Bool = false
     @Published var canSync: Bool = false
     @Published var canInteract: Bool = false
+    /// Running the minimal recovery memboot (CE's MinimalMemboot); the title shows "Recovery mode"
+    @Published var isRecoveryMode: Bool = false
 
     // Version info
     @Published var bootVersion: String = ""
@@ -154,6 +156,16 @@ final class DeviceManager: ObservableObject {
         return false
     }
 
+    /// Hand the console over to a recovery task: drop our session and stay
+    /// disconnected until the task clears `suppressAutoConnect`.
+    func releaseSessionForRecovery() {
+        Self.debugLog("releaseSessionForRecovery")
+        connectTask?.cancel()
+        connectTask = nil
+        suppressAutoConnect = true
+        disconnect()
+    }
+
     // MARK: - USB Device Events
 
     private func onRNDISDeviceAppeared() {
@@ -230,6 +242,7 @@ final class DeviceManager: ObservableObject {
         canSync = false
         canInteract = false
         customFirmwareLoaded = false
+        isRecoveryMode = false
         consoleType = .unknown
         bootVersion = ""
         kernelVersion = ""
@@ -258,6 +271,10 @@ final class DeviceManager: ObservableObject {
                     uniqueId = uidResult.output
                 }
             }
+
+            // Minimal recovery memboot? (same check as CE)
+            let memboot = try await shell.execute("source /hakchi/config; [ \"$cf_memboot\" = \"y\" ]")
+            isRecoveryMode = memboot.succeeded
 
             // Read version info
             let hasVersion = try await shell.execute("[ -f /var/version ] && echo yes")
