@@ -32,7 +32,8 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Linked sync (`.storage`) on/off, always copy original games | `SyncTask` | ⬜ |
 | Free-space check (memory stats) | `MemoryStats.cs` | ⬜ |
 | Push console settings (`cfg_*`) after sync | `hakchi.SyncConfig` | ⬜ |
-| Compress / decompress games (7z) | `NesApplication.Compress` | ⬜ |
+| Compress / decompress games (7z): `GameCompression` + LZMA 7z writer (vendored LZMA SDK) | `NesApplication.Compress` | ✅ |
+| Compress / decompress from the library UI and the "Compress games when adding" setting | `MainForm`, `ConfigIni.Compress` | ⬜ |
 
 ## Phase 3 — Library and UI
 
@@ -92,13 +93,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Mod Hub browse + install | `ModHub/` | ✅ |
-| Local module library (`user_mods/`), install from library | `Hmod/SelectForm` | ⬜ |
+| Mod Hub browse + install (Welcome readme, category pages, Download vs Download and install, `extract`) | `ModHub/` | ✅ |
+| Multiple repositories (Modules menu item per repository) | `MainForm.populateRepos` | ✅ |
+| Local module library (`user_mods/`): files/folders, readme front matter, group by, delete, add/drop, archives with modules | `Hmod/SelectForm`, `Hmod.cs` | ✅ |
+| Install extra modules from the library (staged, applied on reboot) | `ModTasks` | ✅ |
 | Uninstall modules | `ModTasks` | ✅ |
-| Repository manager (add/edit/delete/reorder, `.hrepo` drop) | `RepoManagementForm.cs` | ⬜ |
-| Mod Hub games tab (`.clvg`) | `ModHub/` | ⬜ |
-| Modules report (HTML) | `MainForm` | ⬜ |
-| Bluetooth controller pairing | `Wireless/Bluetooth` | ⬜ |
+| Repository manager (add/edit/delete/reorder, `.hrepo` drop and import) | `RepoManagementForm.cs` | ✅ |
+| Mod Hub games tab (`.clvg` download + import) | `ModHub/` | ✅ |
+| Modules report (HTML, CE template) | `MainForm` | ✅ |
+| Bluetooth controller pairing (via `bluetoothctl` over SSH; CE uses TCP port 787) | `Wireless/Bluetooth` | ✅ |
 
 ## Not ported
 

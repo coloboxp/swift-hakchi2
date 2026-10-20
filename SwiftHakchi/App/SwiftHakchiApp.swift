@@ -196,19 +196,6 @@ struct KernelCommands: Commands {
     }
 }
 
-struct ModulesCommands: Commands {
-    @ObservedObject var appState: AppState
-
-    var body: some Commands {
-        CommandMenu("Modules") {
-            Button("Module Manager...") {
-                appState.showModuleManager = true
-            }
-            .keyboardShortcut("m", modifiers: [.command, .shift])
-        }
-    }
-}
-
 struct ToolsCommands: Commands {
     @ObservedObject var appState: AppState
 

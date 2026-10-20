@@ -32,6 +32,15 @@ let package = Package(
             ]
         ),
         .target(
+            name: "LzmaSDK",
+            path: "vendor/lzma",
+            sources: ["src/"],
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("Z7_ST"),
+            ]
+        ),
+        .target(
             name: "USBBridge",
             dependencies: ["LibSSH2"],
             path: "USBBridge",
@@ -46,6 +55,7 @@ let package = Package(
             name: "SwiftHakchi",
             dependencies: [
                 "USBBridge",
+                "LzmaSDK",
                 .product(name: "SWCompression", package: "SWCompression"),
             ],
             path: "SwiftHakchi",

@@ -33,15 +33,17 @@ import SWCompression
         #expect(ModRepositoryService.parseFrontMatter("no front matter").isEmpty)
     }
 
-    @Test func listKeepsOnlyHmods() {
-        let list = "2048_2048.clvg\ncurl.hmod\r\nnosaves.hmod\n\n"
-        #expect(ModRepositoryService.parseList(list) == ["curl.hmod", "nosaves.hmod"])
+    @Test func listKeepsModulesAndGames() {
+        let list = "2048_2048.clvg\ncurl.hmod\r\nnosaves.hmod\nreadme.md\n\n"
+        #expect(ModRepositoryService.parseList(list) == ["2048_2048.clvg", "curl.hmod", "nosaves.hmod"])
     }
 
     @Test func parsesPackArchive() throws {
         let files: [(String, String)] = [
             ("./list", "curl.hmod\nGame.clvg\nnosaves.hmod\n"),
+            ("./readme.md", "# Welcome"),
             ("./curl.hmod/link", "https://example.com/files/curl.hmod\n"),
+            ("./curl.hmod/extract", ""),
             ("./curl.hmod/md5", "bbb28a561fd97f72f9d80d6781890a44\n"),
             ("./curl.hmod/readme.md", "---\nName: Curl\nCategory: System\nCreator: madmonkey\n---\n"),
             ("./nosaves.hmod/link", "https://example.com/files/nosaves.hmod"),
@@ -54,10 +56,16 @@ import SWCompression
         }
         let pack = try GzipArchive.archive(data: TarContainer.create(from: entries))
 
-        let modules = try ModRepositoryService.parsePack(pack, repoURL: repoURL)
+        let contents = try ModRepositoryService.parsePack(pack, repoURL: repoURL)
+        #expect(contents.readme == "# Welcome")
+        let modules = contents.modules
         #expect(modules.map(\.id) == ["curl", "nosaves"])
+        #expect(contents.games.map(\.fileName) == ["Game.clvg"])
+        #expect(contents.games.first?.category == "Games")
 
         let curl = try #require(modules.first)
+        #expect(curl.extract)
+        #expect(curl.readme?.creator == "madmonkey")
         #expect(curl.name == "Curl")
         #expect(curl.category == "System")
         #expect(curl.creator == "madmonkey")
@@ -65,6 +73,7 @@ import SWCompression
         #expect(curl.downloadURL?.absoluteString == "https://example.com/files/curl.hmod")
 
         let nosaves = modules[1]
+        #expect(!nosaves.extract)
         #expect(nosaves.name == "Nosaves")
         #expect(nosaves.category == "Other")
         #expect(nosaves.itemURL.absoluteString == "https://example.com/mods/.repo/nosaves.hmod/")
@@ -86,6 +95,12 @@ import SWCompression
         #expect(modules.allSatisfy { $0.downloadURL != nil })
 
         // Small module: download and checksum verification end to end
+        // Games and the welcome readme come from the same pack
+        let contents = try await service.fetchRepository(
+            from: "https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/")
+        #expect(contents.games.count > 50)
+        #expect(contents.readme?.isEmpty == false)
+
         let curl = try #require(modules.first { $0.id == "curl" })
         let data = try await service.downloadModule(curl)
         #expect(data.count > 1000)
