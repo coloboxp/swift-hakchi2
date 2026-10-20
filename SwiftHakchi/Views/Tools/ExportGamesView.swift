@@ -63,6 +63,30 @@ struct ExportGamesView: View {
         return "\(v?.volumeName ?? url.lastPathComponent) (\(free) free)"
     }
 
+    /// Same menu structure as the sync (split mode, folders, Folders Manager tree)
+    private func menuExportPlan(games: [Game], selectedStock: Set<String>) -> [String: ExportSource] {
+        let collection = AppConfig.shared.sync.collection(for: consoleType)
+        let customGames = games.filter { $0.isSelected && $0.source == .local }
+        let cached = StockGameCache.load(deviceId: AppConfig.shared.lastDeviceId)?.games ?? []
+        let stock: [(game: Game, desktop: DesktopFile)] = games
+            .filter { $0.isStock && selectedStock.contains($0.code) }
+            .compactMap { game in
+                cached.first { $0.code == game.code }.map { (game, DesktopFile(string: $0.desktopContent)) }
+            }
+
+        var layout = MenuExportLayout(consoleType: consoleType, collection: collection)
+        if collection.foldersMode == .custom {
+            let menuGames = GameSyncService.menuRoot(customGames: customGames, stockGames: stock.map(\.game),
+                                                     sources: [:])
+                .elements.compactMap { element -> MenuGame? in
+                    if case .game(let g) = element { return g }
+                    return nil
+                }
+            layout.customTree = (try? FolderTreeStore.load(console: consoleType, games: menuGames))?.root
+        }
+        return layout.plan(customGames: customGames, stockGames: stock)
+    }
+
     private func export() {
         guard let volume else { return }
         let games = appState.gameManager.games
@@ -74,14 +98,17 @@ struct ExportGamesView: View {
             exportGames += cache.games.filter { selectedStock.contains($0.code) }
                 .map { ExportGame(code: $0.code, kind: .stock(desktop: $0.desktopContent)) }
         }
-        var layout = FlatExportLayout(consoleType: consoleType)
+        let plan: [String: ExportSource]
         if linked, linkedPossible {
-            // Path of the games folder relative to the drive, as the console sees it
+            // Linked export: ROMs stay in the library, entries point at it through /media
+            var layout = FlatExportLayout(consoleType: consoleType)
             let relative = AppConfig.shared.gamesDirectory.standardizedFileURL.path
                 .dropFirst(volume.standardizedFileURL.path.count)
             layout.linkedMediaPath = "/media" + (relative.hasPrefix("/") ? relative : "/" + relative)
+            plan = layout.plan(games: exportGames)
+        } else {
+            plan = menuExportPlan(games: games, selectedStock: selectedStock)
         }
-        let plan = layout.plan(games: exportGames)
         let gameCount = exportGames.count
         let root = GameExporter.exportRoot(volume: volume, consoleType: consoleType)
         let savesFolder = createSaves ? volume.appendingPathComponent("hakchi/saves", isDirectory: true) : nil

@@ -19,7 +19,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Multi-select in the games grid | `MainForm` | ✅ |
 | Select emulation core dialog (context menu + after import for unknown systems) | `SelectCoreDialog.cs` | ✅ |
 | `.clvg` game archive import, `.desktop` folder import, `.cue`/`.gdi`/`.m3u` multi-file games | `AddGamesTask`, `GetGameFiles` | ✅ |
-| Repair games (automatic migration of older libraries; manual command in Phase 3) | `NesApplication.Repair` | 🚧 |
+| Repair games (context menu, CE defaults) and automatic migration of older libraries (keeps archives and arguments) | `NesApplication.Repair` | ✅ |
 
 ## Phase 2 — Sync engine
 
@@ -35,7 +35,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Per-console selected games (CE's SelectedGames / OriginalGames) | `ConfigIni` | ✅ |
 | Import from Console: binary-safe transfer, pick games from a list | `GameImporterForm.cs` | ✅ |
 | Compress / decompress games (7z): `GameCompression` + LZMA 7z writer (vendored LZMA SDK) | `NesApplication.Compress` | ✅ |
-| Compress / decompress from the library UI and the "Compress games when adding" setting | `MainForm`, `ConfigIni.Compress` | ⬜ |
+| Compress / decompress from the library UI and the "Compress games when adding" setting | `MainForm`, `ConfigIni.Compress` | ✅ |
 
 ## Phase 3 — Library and UI
 
@@ -49,7 +49,6 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Add custom app | `NewCustomGameForm.cs` | ✅ |
 | Restore original games (bundled `desktop_entries.tar`) | `MainForm` | ✅ |
 | Cover matching (CRC, MD Mini art, sibling image, fuzzy), Select cover dialog, prepare art folders, blank covers, 8-bit box art | `NesApplication.FindCover`, `SelectCoverDialog`, `SelectSystemDialog` | ✅ |
-| Cover matching from local `art/` folder, prepare art folders | `NesApplication.FindCover`, `SelectSystemDialog` | ⬜ |
 | IPS patches | `NesApplication.FindPatch` | ✅ |
 | NES iNES checks, FDS header strip, SNES → SFROM conversion | `NesGame`, `FdsGame`, `SnesGame` | ✅ |
 | Separate local game storage per console family | `ConfigIni.SeparateGameLocalStorage` | ✅ |
@@ -68,7 +67,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Compress games / box art, center thumbnail, convert to SFROM, import scraper, disable pop-ups | `ConfigIni` | ✅ |
 | SEGA UI theme (Mega Drive) | `MainForm` | ✅ |
 | Save settings to mini now | `MainForm` | ✅ |
-| hakchi + romfiles.xml update check | `MainForm` | ⬜ |
+| hakchi + romfiles.xml update check (see Phase 5) | `MainForm` | ✅ |
 
 ## Phase 5 — Tools
 
@@ -83,7 +82,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Terminal (line-mode PTY shell) and console file browser — replace PuTTY and the FTP client | `MainForm` | ✅ |
 | Format SD card (non-bootable layout, copy/store saves) | `Tasks/SDFormat` | ✅ |
 | Format SD card: "Make card bootable" / "Copy everything from NAND" | `Tasks/SDFormat` | ➖ CE's own code no longer prepares the `/sd-temp` files this needs |
-| Export games to a USB/SD volume (saves folder, linked export) — flat layout until the sync menu builder lands | `ExportGamesDialog.cs` | 🚧 |
+| Export games to a USB/SD volume with the sync menu structure (folders, Folders Manager tree), saves folder, linked export | `ExportGamesDialog.cs` | ✅ |
 | Help: Important message (MOTD), Technical information, project links | `MainForm`, `Motd.cs` | ✅ |
 | Startup update of hakchi.hmod (`data/hakchi-latest.hmod`) and `romfiles.xml` | `MainForm` | ✅ |
 
@@ -117,6 +116,23 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Mod Hub games tab (`.clvg` download + import) | `ModHub/` | ✅ |
 | Modules report (HTML, CE template) | `MainForm` | ✅ |
 | Bluetooth controller pairing (via `bluetoothctl` over SSH; CE uses TCP port 787) | `Wireless/Bluetooth` | ✅ |
+
+## Needs a check on real hardware
+
+Everything above is covered by unit tests where the logic allows it, but these parts
+talk to the console and were written without one. Check them before relying on them:
+
+| Area | What to check |
+|---|---|
+| Sync | First incremental sync on a console with existing games: nothing deleted that should stay, games without a local ROM keep their console files, second sync uploads nothing |
+| Folder modes | Folders, pages and the Folders Manager tree show up on the console menu; back/home folders work |
+| Console settings | `cfg_*` values are read on connect and pushed after sync; controller hacks take effect after reboot |
+| Import from Console | Large ROMs (e.g. 32 MB GBA, `.7z`) arrive complete |
+| Modules | Install/uninstall through the transfer folder + Apply & Reboot; Bluetooth pairing |
+| Compression | Games compressed by this app (`.7z`, LZMA) start on the console (hakchi's tiny7zx) |
+| SSH bridge | Streaming exec (NAND/kernel dumps, large uploads), the Terminal window next to other commands |
+| Recovery | Shell memboot (kexec) and every Kernel menu task; try the harmless ones (boot recovery, dump kernel) first |
+| Tools | Screenshot, save-state export/import, boot splash, firmware switch, SD format |
 
 ## Not ported
 

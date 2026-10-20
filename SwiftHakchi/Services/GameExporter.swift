@@ -138,3 +138,63 @@ struct GameExporter {
         }
     }
 }
+
+/// CE's export with the same menu structure as the sync: the collection's split
+/// mode (pages, folders, Folders Manager tree), folder entries and images.
+/// Files go to `NNN/CODE/` with ROM paths under /var/games (CE's normal, not linked, layout).
+struct MenuExportLayout {
+    let consoleType: ConsoleType
+    let collection: CollectionSettings
+    /// Folders Manager tree, used in Custom mode
+    var customTree: MenuCollection?
+
+    /// Stock games below squashfs on the console (CE's GamesSquashFsPath)
+    private var squashfsGamesPath: String {
+        switch consoleType {
+        case .nes, .famicom: return "/var/squashfs/usr/share/games/nes/kachikachi"
+        case .megaDrive: return "/var/squashfs"
+        default: return "/var/squashfs/usr/share/games"
+        }
+    }
+
+    /// `stockGames` pairs each selected stock game with its .desktop from the console cache
+    func plan(customGames: [Game], stockGames: [(game: Game, desktop: DesktopFile)]) -> [String: ExportSource] {
+        var sources: [String: SyncGameSource] = [:]
+        for game in customGames {
+            let dir = URL(fileURLWithPath: game.romPath)
+            let desktop = (try? Data(contentsOf: dir.appendingPathComponent("\(game.code).desktop")))
+                .map(DesktopFile.init(data:))
+                ?? DesktopFile(string: "Exec=\(game.commandLine)\nCode=\(game.code)\nName=\(game.name)")
+            sources[game.code] = SyncGameSource(code: game.code, directory: dir, desktop: desktop, isOriginal: false)
+        }
+        for (game, desktop) in stockGames {
+            sources[game.code] = SyncGameSource(code: game.code, directory: nil, desktop: desktop, isOriginal: true)
+        }
+
+        let options = MenuOptions(backPosition: collection.backFolderPosition, homeFolder: collection.homeFolder)
+        let root: MenuCollection
+        if let customTree {
+            root = customTree
+            root.addBack(options: options)
+        } else {
+            root = GameSyncService.menuRoot(customGames: customGames, stockGames: stockGames.map(\.game),
+                                            sources: sources)
+            root.split(collection.foldersMode, maxElements: collection.maxGamesPerFolder, options: options)
+        }
+
+        let context = SyncContext(uploadPath: "/var/games", squashfsGamesPath: squashfsGamesPath, linked: false,
+                                  alwaysCopyOriginals: false, consoleType: consoleType,
+                                  imageSet: collection.folderImagesSet)
+        let build = SyncFileBuilder(context: context, games: sources).build(root: root)
+
+        var plan: [String: ExportSource] = [:]
+        for file in build.files {
+            let relative = file.path.hasPrefix("./") ? String(file.path.dropFirst(2)) : file.path
+            switch file.source {
+            case .file(let url): plan[relative] = .file(url)
+            case .data(let data): plan[relative] = .data(data)
+            }
+        }
+        return plan
+    }
+}
