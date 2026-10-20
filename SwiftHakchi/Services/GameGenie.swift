@@ -33,6 +33,19 @@ enum GameGenie {
         text.split(whereSeparator: { ",\t ;\n\r".contains($0) }).map { String($0).uppercased() }
     }
 
+    /// Format check with CE's rules: NES = 6 or 8 Game Genie letters, SNES = "XXXX-XXXX"
+    static func isValidCode(_ raw: String) -> Bool {
+        let code = raw.uppercased().trimmingCharacters(in: .whitespaces)
+        if (code.count == 6 || code.count == 8) && code.allSatisfy({ nesLetters[$0] != nil }) {
+            // The 3rd letter's high bit tells 6 (0) from 8 (1) letter codes
+            let flag = nesLetters[Array(code)[2]]!.first!
+            return (code.count == 6) == (flag == "0")
+        }
+        let parts = code.split(separator: "-")
+        return parts.count == 2 && parts.allSatisfy { $0.count == 4 }
+            && code.replacingOccurrences(of: "-", with: "").allSatisfy { "0123456789ABCDEF".contains($0) }
+    }
+
     // MARK: - Patching
 
     /// The ROM with the game's codes applied, or nil when it has no codes or the

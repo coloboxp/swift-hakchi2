@@ -76,8 +76,7 @@ struct GameGenieView: View {
 
     private func addCode() {
         let code = newCode.trimmingCharacters(in: .whitespaces).uppercased()
-        // Validate the format with the matching decoder
-        guard GameGenieNES.decode(code) != nil || GameGenieSNES.decode(code) != nil else {
+        guard GameGenie.isValidCode(code) else {
             error = GameGenieError.badFormat(code).localizedDescription
             return
         }
