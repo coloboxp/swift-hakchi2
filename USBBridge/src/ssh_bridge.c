@@ -268,8 +268,11 @@ int ssh_exec(ssh_session_t *s, const char *command, ssh_exec_result_t *result,
 
         if (libssh2_channel_eof(ch)) break;
 
-        // If no data available, pump the TCP stack to receive more
-        if (!got_data) {
+        if (got_data) {
+            // The timeout is an idle timeout: long transfers keep going while data flows
+            read_deadline = now_ms_ssh() + (uint64_t)timeout_ms;
+        } else {
+            // If no data available, pump the TCP stack to receive more
             tcp_poll(s->tcp, 100);
         }
     }
@@ -350,6 +353,7 @@ int ssh_exec_stdin(ssh_session_t *s, const char *command,
         }
     }
     fprintf(stderr, "[SSH] exec_stdin: write complete (%u bytes), sending EOF\n", written);
+    int short_write = written < stdin_len;
 
     // Signal EOF on stdin
     libssh2_channel_send_eof(ch);
@@ -396,7 +400,9 @@ int ssh_exec_stdin(ssh_session_t *s, const char *command,
 
         if (libssh2_channel_eof(ch)) break;
 
-        if (!got_data) {
+        if (got_data) {
+            read_deadline = now_ms_ssh() + (uint64_t)timeout_ms;  // idle timeout
+        } else {
             tcp_poll(s->tcp, 100);
         }
     }
@@ -420,7 +426,8 @@ int ssh_exec_stdin(ssh_session_t *s, const char *command,
     libssh2_channel_close(ch);
     libssh2_channel_free(ch);
 
-    return 0;
+    // The remote side did not get all the data (it may still exit 0, e.g. cat)
+    return short_write ? -2 : 0;
 }
 
 // ---------------------------------------------------------------------------

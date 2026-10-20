@@ -70,6 +70,7 @@ let package = Package(
                 .copy("Resources/blankBoot.png"),
                 .copy("Resources/splash.gz"),
                 .copy("Resources/tools"),
+                .copy("Resources/folder_images"),
                 .copy("Resources/BlankCovers"),
                 .copy("Resources/SpineTemplates"),
                 .copy("Resources/GameGenieDB.xml"),

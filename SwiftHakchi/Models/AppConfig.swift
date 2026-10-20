@@ -17,11 +17,14 @@ final class AppConfig: ObservableObject, Codable {
     @Published var modRepositories: [ModRepository] = [.kmfd]
     /// Convert SNES ROMs to Canoe's .sfrom format on import (CE: ConvertToSFROM, default on)
     @Published var convertToSfrom: Bool = true
+    /// Sync, menu structure and console (cfg_*) settings
+    @Published var sync = SyncSettings()
 
     enum CodingKeys: String, CodingKey {
         case lastConsoleType, lastDeviceId, installedGameCodes, separateGameStorage, forceNetwork
         case uploadCompressed, exportLinked, maxGameSize
         case theGamesDbApiKey, modRepositoryURLs, modRepositories, convertToSfrom
+        case sync
     }
 
     init() {}
@@ -43,6 +46,7 @@ final class AppConfig: ObservableObject, Codable {
             modRepositories = urls.map(ModRepository.init(legacyURL:))
         }
         convertToSfrom = try container.decodeIfPresent(Bool.self, forKey: .convertToSfrom) ?? true
+        sync = try container.decodeIfPresent(SyncSettings.self, forKey: .sync) ?? SyncSettings()
     }
 
     func encode(to encoder: Encoder) throws {
@@ -58,6 +62,7 @@ final class AppConfig: ObservableObject, Codable {
         try container.encode(theGamesDbApiKey, forKey: .theGamesDbApiKey)
         try container.encode(modRepositories, forKey: .modRepositories)
         try container.encode(convertToSfrom, forKey: .convertToSfrom)
+        try container.encode(sync, forKey: .sync)
     }
 
     // MARK: - Persistence

@@ -147,6 +147,7 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         deviceManager.start()
+        startSelectionTracking()
     }
 
     // MARK: - Library Enrichment
@@ -178,6 +179,7 @@ final class AppState: ObservableObject {
         } catch {
             logger.warning("Core refresh failed: \(error.localizedDescription)")
         }
+        await refreshConsoleConfig()
         await BluetoothState.shared.check(shell: shell)  // shows the Bluetooth menu item
         await gameManager.pullGamesFromConsole(shell: shell, consoleType: consoleType, deviceId: deviceId)
         gameManager.matchExistingGames()
@@ -485,15 +487,8 @@ final class AppState: ObservableObject {
 
                     runner.updateProgress(status: "Downloading \(localName)...", fraction: 0.2)
 
-                    guard let result = try? await shell.execute(
-                        "base64 \"\(remotePath)/\(romFilename)\" 2>/dev/null"
-                    ), result.succeeded else {
-                        throw DownloadError.noFiles(code)
-                    }
-
-                    let base64Str = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !base64Str.isEmpty,
-                          let data = Data(base64Encoded: base64Str, options: .ignoreUnknownCharacters),
+                    // Binary-safe download (base64 over exec failed for large ROMs)
+                    guard let data = try? await shell.download(path: "\(remotePath)/\(romFilename)"),
                           !data.isEmpty else {
                         throw DownloadError.noFiles(code)
                     }
@@ -534,50 +529,15 @@ final class AppState: ObservableObject {
     }
 
     private func performSync() {
-        guard deviceManager.isConnected, let shell = deviceManager.sshService else { return }
-        let consoleType = deviceManager.consoleType
-        showTaskProgress = true
-
-        taskRunner.run(name: "Syncing games") { [weak self] runner in
-            guard let self else { return }
-            let syncService = GameSyncService(
-                shell: shell,
-                consoleType: consoleType
-            )
-            try await syncService.syncGames(
-                games: self.gameManager.games,
-                gameSyncPath: "/var/lib/hakchi/games"
-            ) { status, progress in
-                runner.updateProgress(status: status, fraction: progress)
-            }
-
-            // Refresh installed status after sync completes
-            runner.updateProgress(status: "Verifying installed games...", fraction: 0.95)
-            await self.gameManager.refreshInstalledStatus(shell: shell, consoleType: consoleType)
-        }
+        startIncrementalSync()
     }
 
     // MARK: - Import from Console
 
     /// Import custom games from the console into the local library
+    /// (scan, then pick games in a list, like CE's "Import games from mini")
     func importFromConsole() async {
-        guard deviceManager.isConnected, let shell = deviceManager.sshService else { return }
-        let consoleType = deviceManager.consoleType
-        showTaskProgress = true
-
-        taskRunner.run(name: "Importing games from console") { [weak self] runner in
-            guard let self else { return }
-            let count = await self.gameManager.importGamesFromConsole(
-                shell: shell,
-                consoleType: consoleType
-            ) { status, progress in
-                runner.updateProgress(status: status, fraction: progress)
-            }
-            runner.updateProgress(
-                status: count > 0 ? "Imported \(count) game(s)" : "No new games to import",
-                fraction: 1.0
-            )
-        }
+        startConsoleImport()
     }
 
     // MARK: - Game navigation

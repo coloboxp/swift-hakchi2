@@ -25,13 +25,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Incremental sync (remote file diff, upload only changes, cleanup) | `Tasks/SyncTask.cs` | ⬜ |
-| Menu structure modes (no split, pages, folders, by letter, original games in root…) | `NesMenuCollection.Split` | ⬜ |
-| Max games per folder, back button position, home folder, folder image sets | `ConfigIni`, `NesMenuFolder.cs` | ⬜ |
-| Separate games for multiboot (`<sync>/<system-code>`) | `SyncTask` | ⬜ |
-| Linked sync (`.storage`) on/off, always copy original games | `SyncTask` | ⬜ |
-| Free-space check (memory stats) | `MemoryStats.cs` | ⬜ |
-| Push console settings (`cfg_*`) after sync | `hakchi.SyncConfig` | ⬜ |
+| Incremental sync (remote file diff, upload only changes, cleanup) | `Tasks/SyncTask.cs` | ✅ |
+| Menu structure modes (no split, pages, folders, by letter, original games in root…) | `NesMenuCollection.Split` | ✅ |
+| Max games per folder, back button position, home folder, folder image sets | `ConfigIni`, `NesMenuFolder.cs` | ✅ |
+| Separate games for multiboot (`<sync>/<system-code>`) | `SyncTask` | ✅ |
+| Linked sync (`.storage`) on/off, always copy original games | `SyncTask` | ✅ |
+| Free-space check (memory stats) | `MemoryStats.cs` | ✅ |
+| Push console settings (`cfg_*`) after sync | `hakchi.SyncConfig` | ✅ |
+| Per-console selected games (CE's SelectedGames / OriginalGames) | `ConfigIni` | ✅ |
+| Import from Console: binary-safe transfer, pick games from a list | `GameImporterForm.cs` | ✅ |
 | Compress / decompress games (7z): `GameCompression` + LZMA 7z writer (vendored LZMA SDK) | `NesApplication.Compress` | ✅ |
 | Compress / decompress from the library UI and the "Compress games when adding" setting | `MainForm`, `ConfigIni.Compress` | ⬜ |
 
@@ -39,14 +41,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Folders Manager (tree editor, auto-structure buttons, `folders*.htm`) | `FoldersManagerForm.cs` | ⬜ |
-| Selection presets | `MainForm` | ⬜ |
+| Folders Manager (tree editor, auto-structure buttons, `folders*.htm`) | `FoldersManagerForm.cs` | ✅ |
+| Selection presets | `MainForm` | ✅ |
 | View: original games position, sort by name/core/console/region, group without box art | `MainForm` | ✅ (original games default to Hidden, they already have their own tab) |
 | Context menu: add/remove prefix, set region, scrape selected, archive `.clvg`, compress/decompress, delete box art, scan box art, repair games, show in Finder | `MainForm` | ✅ |
 | Detail panel: sort name, copyright, max players, genre list, region, save count, compress toggle, ID/size, cover from file/paste/drop, autosave | `MainForm` | ✅ |
 | Add custom app | `NewCustomGameForm.cs` | ✅ |
 | Restore original games (bundled `desktop_entries.tar`) | `MainForm` | ✅ |
 | Cover matching (CRC, MD Mini art, sibling image, fuzzy), Select cover dialog, prepare art folders, blank covers, 8-bit box art | `NesApplication.FindCover`, `SelectCoverDialog`, `SelectSystemDialog` | ✅ |
+| Cover matching from local `art/` folder, prepare art folders | `NesApplication.FindCover`, `SelectSystemDialog` | ⬜ |
 | IPS patches | `NesApplication.FindPatch` | ✅ |
 | NES iNES checks, FDS header strip, SNES → SFROM conversion | `NesGame`, `FdsGame`, `SnesGame` | ✅ |
 | Separate local game storage per console family | `ConfigIni.SeparateGameLocalStorage` | ✅ |
@@ -60,11 +63,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Controller hacks (reset combo, autofire, X/Y autofire, Famicom start) | `ConfigIni.consoleSettings` | ⬜ |
-| Disable epilepsy protection, global extra command-line args | `ConfigIni` | ⬜ |
+| Controller hacks (reset combo, autofire, X/Y autofire, Famicom start) | `ConfigIni.consoleSettings` | ✅ |
+| Disable epilepsy protection, global extra command-line args | `ConfigIni` | ✅ |
 | Compress games / box art, center thumbnail, convert to SFROM, import scraper, disable pop-ups | `ConfigIni` | ✅ |
-| SEGA UI theme (Mega Drive) | `MainForm` | ⬜ |
-| Save settings to mini now | `MainForm` | ⬜ |
+| SEGA UI theme (Mega Drive) | `MainForm` | ✅ |
+| Save settings to mini now | `MainForm` | ✅ |
 | hakchi + romfiles.xml update check | `MainForm` | ⬜ |
 
 ## Phase 5 — Tools
