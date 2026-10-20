@@ -29,6 +29,14 @@ struct Game: Identifiable, Hashable {
     var isSelected: Bool  // whether to sync this game
     var isOnConsole: Bool = false  // whether this game is currently installed on the console
     var source: GameSource
+    /// libretro system name from metadata.json ("" = unknown)
+    var system: String = ""
+    /// Core bin key from metadata.json ("" = none chosen)
+    var core: String = ""
+    /// Menu prefix shown before the name on the console (CePrefix)
+    var cePrefix: String = ""
+    /// Region: "us", "eu" or "jp" (country key in the .desktop file)
+    var country: String = ""
 
     var isStock: Bool { source == .stock }
 
@@ -70,6 +78,8 @@ extension Game {
         self.consoleType = consoleType
         self.isSelected = true  // all games selected by default (stock = included in overlay)
         self.source = source
+        self.cePrefix = desktopFile.cePrefix
+        self.country = desktopFile.country
 
         let gamePath = (basePath as NSString).appendingPathComponent(desktopFile.code)
         self.romPath = gamePath
@@ -80,13 +90,13 @@ extension Game {
         }
     }
 
-    /// Create a Game from remote .desktop content pulled over SSH
     /// Evict this game's cached cover image so it reloads from disk on next access.
     func invalidateCoverCache() {
         guard let path = coverArtPath else { return }
         ImageCache.shared.evict(path)
     }
 
+    /// Create a Game from remote .desktop content pulled over SSH
     init(code: String, desktopContent: String, consoleType: ConsoleType, source: GameSource) {
         let desktop = DesktopFile(string: desktopContent)
         if desktop.code.isEmpty { desktop.code = code }
@@ -108,6 +118,10 @@ extension Game {
         self.isSelected = true  // all games selected by default
         self.isOnConsole = source == .console  // console-pulled games are already installed
         self.source = source
+        self.cePrefix = desktop.cePrefix
+        self.country = desktop.country
+        self.system = SystemCatalog.system(forExec: desktop.exec).isUnknown
+            ? "" : SystemCatalog.system(forExec: desktop.exec).name
         self.romPath = ""
         self.coverArtPath = nil
     }

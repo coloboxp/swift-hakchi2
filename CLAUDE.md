@@ -14,7 +14,15 @@ swift build           # Build only (debug)
 swift build -c release  # Release build
 ```
 
-Requires macOS 14.0+ (Sonoma) and Swift 5.9+. No test target or linter is configured.
+```bash
+./install.sh          # Release build, install to /Applications
+./scripts/test.sh     # Unit tests (Tests/SwiftHakchiTests, Swift Testing); wraps `swift test`
+HAKCHI_LIVE_TESTS=1 ./scripts/test.sh  # Include tests that hit the live mod repository
+```
+
+Requires macOS 14.0+ (Sonoma) and Swift 5.9+. No linter is configured.
+
+With Command Line Tools only (no Xcode), the macOS 27 SDK fails on SwiftUI's `@State` macro (missing `SwiftUIMacros` plugin). The scripts source `scripts/select-sdk.sh` to use the macOS 26 SDK; for manual builds set `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`.
 
 ## Architecture
 
@@ -36,6 +44,8 @@ MbedCrypto (vendored C) → LibSSH2 (vendored C) → USBBridge (C) → SwiftHakc
   - `FlashService` — Install/uninstall/factory-reset workflows (memboot → SSH → upload payloads → reboot)
   - `GameManagerService` — Local game library + console game pulling + ROM import
   - `GameSyncService` — Syncs selected games to console over SSH (matching hakchi2-CE directory layout)
+  - `HmodService` — Stages hmods in `/var/lib/hakchi/transfer/` (plus an `uninstall` list); hakchi's `p7080_hmods` preinit script applies them on the next reboot. Installed list comes from `hakchi pack_list`
+  - `ModRepositoryService` — Reads hakchi2-CE `.repo/` repositories (`pack.tgz` with per-item `link`/`md5`/`readme.md`, fallback to `list`)
   - `PayloadService` — Loads bundled binary resources (fes1.bin, uboot, boot.img, hmods)
   - `TaskRunner` — Progress tracking for async operations
 - **Models** (`Models/`) — `Game`, `ConsoleType`, `DesktopFile` (parser/serializer for .desktop files), `AppConfig` (persistent settings as Codable JSON), `HmodPackage`

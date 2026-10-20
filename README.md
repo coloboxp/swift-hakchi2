@@ -42,11 +42,25 @@ Clone the repository and run:
 ./run.sh
 ```
 
-This builds the project, assembles a `.app` bundle, and launches it. For build-only:
+This builds the project, assembles a `.app` bundle, and launches it. To build a release copy and install it to `/Applications`:
+
+```bash
+./install.sh
+```
+
+For build-only or tests:
 
 ```bash
 swift build              # Debug
 swift build -c release   # Release
+./scripts/test.sh        # Unit tests
+HAKCHI_LIVE_TESTS=1 ./scripts/test.sh   # Also test against the live KMFD mod repository
+```
+
+**Command Line Tools only (no Xcode):** the macOS 27 SDK makes SwiftUI's `@State` a macro, and the Command Line Tools do not include the plugin that expands it. `run.sh` and `install.sh` switch to the newest installed macOS 26 SDK in that case (see `scripts/select-sdk.sh`). When you run `swift build` yourself, set it by hand:
+
+```bash
+SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build
 ```
 
 ## Usage
@@ -96,8 +110,9 @@ The console has approximately 300 MB of usable storage. If syncing would remove 
 
 Open the **Module Manager** from the Modules menu (Cmd+Shift+M):
 
-- **Browse tab** — Click "Load Repository" to fetch available modules, then click "Install" next to any module. You can also use "Install from File..." for local `.hmod` files.
+- **Browse tab** — Loads the KMFD Mod Hub repository (cached for a day; the reload button fetches it again). Search or filter by category, then click "Install" next to any module. You can also use "Install from File..." for local `.hmod` files or unpacked `.hmod` folders.
 - **Installed tab** — View modules on the console, select any to uninstall with "Uninstall Selected"
+- **Apply & Reboot** — Installs and removals are staged on the console first. Click "Apply & Reboot": hakchi applies the changes while the console boots, then reboots once more. This takes about a minute.
 
 ### Settings
 

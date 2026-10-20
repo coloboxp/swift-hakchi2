@@ -142,6 +142,13 @@ struct ContentView: View {
                 .frame(minWidth: 300)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { appState.coreDialogGameIds != nil },
+            set: { if !$0 { appState.coreDialogGameIds = nil } }
+        )) {
+            SelectCoreView(gameIds: appState.coreDialogGameIds ?? [])
+                .environmentObject(appState)
+        }
         .sheet(isPresented: $appState.showModuleManager) {
             ModuleManagerView()
                 .environmentObject(appState)

@@ -2,9 +2,8 @@ import Foundation
 
 /// Parser/serializer for .desktop files used by the NES/SNES Classic
 final class DesktopFile {
+    /// Full command line. `bin` and `args` are derived from it.
     var exec: String = ""
-    var bin: String = ""
-    var args: [String] = []
     var profilePath: String = ""
     var name: String = ""
     var cePrefix: String = ""
@@ -79,7 +78,6 @@ final class DesktopFile {
             switch key {
             case "exec":
                 exec = value
-                parseExec(value)
             case "path":
                 let normalized = value.replacingOccurrences(of: "\\", with: "/")
                     .replacingOccurrences(of: "//", with: "/")
@@ -134,16 +132,66 @@ final class DesktopFile {
         hasUnsavedChanges = false
     }
 
-    private func parseExec(_ value: String) {
-        // Match binary path including any " -rom" suffixes
+    // MARK: - Exec helpers
+
+    /// Program part of Exec, including any " -rom" suffix (CE's `Bin`),
+    /// e.g. "/bin/clover-canoe-shvc-wr -rom"
+    var bin: String {
+        Self.splitExec(exec).bin
+    }
+
+    /// Arguments after the program, split on spaces (CE's `Args`); `args[0]` is the ROM path
+    var args: [String] {
+        Self.splitExec(exec).args
+    }
+
+    /// ROM path on the console (first argument), if any
+    var romPath: String? {
+        args.first
+    }
+
+    static func splitExec(_ exec: String) -> (bin: String, args: [String]) {
+        let value = exec.trimmingCharacters(in: .whitespaces)
         guard let match = value.range(of: #"^[^\s]+(?:\s+-rom)*"#, options: .regularExpression) else {
-            bin = value
-            args = []
-            return
+            return (value, [])
         }
-        bin = String(value[match])
         let remainder = String(value[match.upperBound...]).trimmingCharacters(in: .whitespaces)
-        args = remainder.isEmpty ? [] : remainder.components(separatedBy: " ").filter { !$0.isEmpty }
+        return (String(value[match]), remainder.split(separator: " ").map(String.init))
+    }
+
+    /// Replace only the leading program, keeping the ROM path and all arguments.
+    /// (CE used `exec.Replace(bin, new)`, which also replaced matches inside paths.)
+    func replaceBin(with newBin: String) {
+        let parts = Self.splitExec(exec)
+        exec = ([newBin] + parts.args).joined(separator: " ")
+    }
+
+    /// Point every argument that contains "…/<code>/" at `base/<code>/`, leaving the
+    /// program untouched. Used to normalize console paths to "/var/games" on import
+    /// and to point at the upload location at sync time (CE does the same per arg).
+    func rebaseGamePaths(to base: String) {
+        guard !code.isEmpty else { return }
+        let parts = Self.splitExec(exec)
+        let pattern = "^[^\\s]*/" + NSRegularExpression.escapedPattern(for: code) + "/"
+        let template = NSRegularExpression.escapedTemplate(for: base + "/" + code + "/")
+        let regex = try! NSRegularExpression(pattern: pattern)
+        let newArgs = parts.args.map { arg -> String in
+            let range = NSRange(arg.startIndex..., in: arg)
+            return regex.stringByReplacingMatches(in: arg, range: range, withTemplate: template)
+        }
+        exec = ([parts.bin] + newArgs).joined(separator: " ")
+    }
+
+    /// CE's fixes applied before every save: an apostrophe followed by a digit
+    /// crashes the console menu, and an empty sort name is derived from the name.
+    func normalizeForSave() {
+        name = name.replacingOccurrences(of: #"'(\d)"#, with: "`$1", options: .regularExpression)
+        sortName = sortName.replacingOccurrences(of: #"'(\d)"#, with: "`$1", options: .regularExpression)
+        if sortName.isEmpty {
+            var s = name.lowercased()
+            if s.hasPrefix("the ") { s.removeFirst(4) }
+            sortName = s
+        }
     }
 
     // MARK: - Serialization

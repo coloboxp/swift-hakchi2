@@ -4,6 +4,8 @@ import SwiftUI
 struct GameCardView: View {
     let game: Game
     let isActive: Bool
+    /// Part of a multi-selection (⌘/⇧-click)
+    var isMultiSelected: Bool = false
     let isOnBar: Bool
     var cardSize: CGFloat = 130
 
@@ -31,6 +33,12 @@ struct GameCardView: View {
             if isOnBar {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.accentColor.opacity(0.15))
+                    .allowsHitTesting(false)
+            }
+
+            if isMultiSelected {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
                     .allowsHitTesting(false)
             }
         }

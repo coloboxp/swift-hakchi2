@@ -14,11 +14,13 @@ final class AppConfig: ObservableObject, Codable {
     @Published var maxGameSize: Int = 300  // MB
     @Published var theGamesDbApiKey: String = ""
     @Published var modRepositoryURLs: [String] = ["https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/"]
+    /// Convert SNES ROMs to Canoe's .sfrom format on import (CE: ConvertToSFROM, default on)
+    @Published var convertToSfrom: Bool = true
 
     enum CodingKeys: String, CodingKey {
         case lastConsoleType, lastDeviceId, installedGameCodes, separateGameStorage, forceNetwork
         case uploadCompressed, exportLinked, maxGameSize
-        case theGamesDbApiKey, modRepositoryURLs
+        case theGamesDbApiKey, modRepositoryURLs, convertToSfrom
     }
 
     init() {}
@@ -36,6 +38,7 @@ final class AppConfig: ObservableObject, Codable {
         theGamesDbApiKey = try container.decodeIfPresent(String.self, forKey: .theGamesDbApiKey) ?? ""
         modRepositoryURLs = try container.decodeIfPresent([String].self, forKey: .modRepositoryURLs)
             ?? ["https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/"]
+        convertToSfrom = try container.decodeIfPresent(Bool.self, forKey: .convertToSfrom) ?? true
     }
 
     func encode(to encoder: Encoder) throws {
@@ -50,6 +53,7 @@ final class AppConfig: ObservableObject, Codable {
         try container.encode(maxGameSize, forKey: .maxGameSize)
         try container.encode(theGamesDbApiKey, forKey: .theGamesDbApiKey)
         try container.encode(modRepositoryURLs, forKey: .modRepositoryURLs)
+        try container.encode(convertToSfrom, forKey: .convertToSfrom)
     }
 
     // MARK: - Persistence
@@ -90,6 +94,11 @@ final class AppConfig: ObservableObject, Codable {
     /// Path for downloaded data files
     var dataDirectory: URL {
         Self.configDirectory.appendingPathComponent("data", isDirectory: true)
+    }
+
+    /// IPS patches matched to ROMs at import time (by CRC32 or file name)
+    var patchesDirectory: URL {
+        Self.configDirectory.appendingPathComponent("patches", isDirectory: true)
     }
 
     /// Path for kernel/dump backups

@@ -42,6 +42,15 @@ struct GameDetailView: View {
 
     // MARK: - Sections
 
+    /// "System · Core" for the detail panel
+    private var coreSummary: String {
+        let system = game.system.isEmpty ? "Unknown system" : game.system
+        let core = CoreCatalog.shared.core(game.core)?.name
+            ?? CoreCatalog.shared.core(forExec: game.commandLine)?.name
+            ?? (game.core.isEmpty ? "no core" : game.core)
+        return "\(system) · \(core)"
+    }
+
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             LabeledContent("Name") {
@@ -71,6 +80,22 @@ struct GameDetailView: View {
             LabeledContent("Genre") {
                 TextField("Genre", text: $game.genre)
                     .textFieldStyle(.roundedBorder)
+            }
+
+            LabeledContent("Console / Core") {
+                HStack {
+                    Text(coreSummary)
+                        .foregroundStyle(game.system.isEmpty ? .secondary : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    if game.source == .local {
+                        Button("Change...") {
+                            appState.openCoreDialog(for: [game])
+                        }
+                        .help("Select emulation core")
+                    }
+                }
             }
 
             LabeledContent("Command Line") {

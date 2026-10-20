@@ -19,7 +19,6 @@ actor GameSyncService {
     private let shell: SSHService
     private let consoleType: ConsoleType
 
-    private static let nesDefaultArgs = "--guest-overscan-dimensions 0,0,9,3 --initial-fadein-durations 3,2 --volume 75 --enable-armet"
     private static let squashfsBase = "/var/squashfs"
 
     init(shell: SSHService, consoleType: ConsoleType) {
@@ -42,6 +41,13 @@ actor GameSyncService {
         let squashfsGamePath = "\(Self.squashfsBase)\(gamePath)"
 
         logger.info("Syncing \(selectedGames.count) custom games, syncBase=\(syncBase)")
+
+        // This sync replaces the whole games folder on the console. A game whose ROM
+        // is not on the Mac (e.g. a failed "Import from Console") would lose it, so stop.
+        let missing = selectedGames.filter { !Self.hasRomFile(for: $0) }
+        guard missing.isEmpty else {
+            throw SyncError.missingRoms(missing.map(\.name).sorted())
+        }
 
         // Step 1: Stop console UI
         progress("Preparing console...", 0.05)
@@ -218,61 +224,49 @@ actor GameSyncService {
 
     private func uploadGame(game: Game, storageDir: String, menuDir: String) async throws {
         let gameDir = URL(fileURLWithPath: game.romPath)
-        guard FileManager.default.fileExists(atPath: gameDir.path),
-              let files = try? FileManager.default.contentsOfDirectory(
-                  at: gameDir, includingPropertiesForKeys: nil
-              ) else {
+        let code = game.code
+        guard FileManager.default.fileExists(atPath: gameDir.path) else {
             logger.warning("Game directory not found: \(gameDir.path)")
             return
         }
 
-        let code = game.code
-        let romFile = files.first { f in
-            let name = f.lastPathComponent
-            return !name.hasSuffix(".desktop") && !name.hasSuffix(".png") && !name.hasPrefix(".")
-        }
-
-        let romExt = romFile?.pathExtension ?? "nes"
-        let safeRomFilename = "\(code).\(romExt)"
-        let romConsolePath = "\(storageDir)/\(code)/\(safeRomFilename)"
-
+        let desktopURL = gameDir.appendingPathComponent("\(code).desktop")
         let desktopData = buildGameDesktop(
-            localData: files.first { $0.lastPathComponent.hasSuffix(".desktop") }
-                .flatMap { try? Data(contentsOf: $0) } ?? Data(),
+            localData: (try? Data(contentsOf: desktopURL)) ?? Data(),
             game: game,
-            romConsolePath: romConsolePath,
             storagePath: "\(storageDir)/\(code)"
         )
 
-        // --- .storage/{code}/ — ROM + PNG ---
+        // --- .storage/{code}/ — every game file, keeping names and subfolders ---
         var storageTar = TarWriter()
         storageTar.addDirectory(name: "\(code)/")
 
-        let coverW = consoleType.coverWidth
-        let coverH = consoleType.coverHeight
-
-        var hasPng = false
-        for file in files {
-            guard let data = try? Data(contentsOf: file) else { continue }
-            let filename = file.lastPathComponent
-            if filename.hasSuffix(".desktop") {
+        let coverName = "\(code).png"
+        var hasCover = false
+        for (relative, file) in Self.gameFiles(in: gameDir) {
+            let lower = relative.lowercased()
+            // Files CE never uploads, plus the .desktop (written to the menu folder)
+            if lower.hasSuffix(".desktop") || lower == GameMetadata.fileName
+                || lower == "\(code)_original.png".lowercased() || lower == "\(code)_spine.png".lowercased()
+                || lower == "\(code)_logo.png".lowercased() || lower == "\(code)_small.png".lowercased() {
                 continue
-            } else if filename.hasSuffix(".png") {
-                hasPng = true
+            }
+            guard let data = try? Data(contentsOf: file) else { continue }
+            if relative == coverName {
                 // Resize cover art to console dimensions (saves upload bandwidth)
-                let resized = resizeCoverArt(data: data, width: coverW, height: coverH)
-                storageTar.addFile(name: "\(code)/\(code).png", contents: resized)
-                let small = resizeCoverArt(data: data, width: 40, height: 40)
-                storageTar.addFile(name: "\(code)/\(code)_small.png", contents: small)
-            } else if romFile != nil && filename == romFile!.lastPathComponent {
-                storageTar.addFile(name: "\(code)/\(safeRomFilename)", contents: data)
+                hasCover = true
+                storageTar.addFile(name: "\(code)/\(coverName)",
+                                   contents: resizeCoverArt(data: data, width: consoleType.coverWidth,
+                                                            height: consoleType.coverHeight))
+                storageTar.addFile(name: "\(code)/\(code)_small.png",
+                                   contents: resizeCoverArt(data: data, width: 40, height: 40))
             } else {
-                storageTar.addFile(name: "\(code)/\(filename)", contents: data)
+                storageTar.addFile(name: "\(code)/\(relative)", contents: data)
             }
         }
 
-        if !hasPng {
-            storageTar.addFile(name: "\(code)/\(code).png", contents: Self.generatePlaceholderPNG())
+        if !hasCover {
+            storageTar.addFile(name: "\(code)/\(coverName)", contents: Self.generatePlaceholderPNG())
             storageTar.addFile(name: "\(code)/\(code)_small.png", contents: Self.generatePlaceholderPNG())
         }
 
@@ -285,33 +279,53 @@ actor GameSyncService {
         try await shell.uploadTar(data: menuTar.finalize(), to: menuDir)
     }
 
-    private func buildGameDesktop(
-        localData: Data, game: Game, romConsolePath: String, storagePath: String
-    ) -> Data {
+    /// True when the game folder holds the ROM named in its Exec line
+    static func hasRomFile(for game: Game) -> Bool {
+        guard let rom = DesktopFile.splitExec(game.commandLine).args.first else { return false }
+        let name = (rom as NSString).lastPathComponent
+        return FileManager.default.fileExists(atPath: (game.romPath as NSString).appendingPathComponent(name))
+    }
+
+    /// Regular files under a game folder as (relative path, URL), skipping hidden files
+    static func gameFiles(in dir: URL) -> [(String, URL)] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
+        ) else { return [] }
+        let base = dir.standardizedFileURL.path + "/"
+        var result: [(String, URL)] = []
+        for case let url as URL in enumerator {
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+            let path = url.standardizedFileURL.path
+            guard path.hasPrefix(base) else { continue }
+            result.append((String(path.dropFirst(base.count)), url))
+        }
+        return result.sorted { $0.0 < $1.0 }
+    }
+
+    /// The game's own .desktop with paths pointed at the upload location.
+    /// The Exec program and arguments are kept as the user (or the core dialog) set them;
+    /// only the "/var/games/CODE/" prefix of each argument is rewritten (CE's linked sync).
+    private func buildGameDesktop(localData: Data, game: Game, storagePath: String) -> Data {
         let desktop: DesktopFile
         if localData.isEmpty {
             desktop = DesktopFile()
             desktop.code = game.code
             desktop.name = game.name
+            desktop.exec = game.commandLine
         } else {
             desktop = DesktopFile(data: localData)
+            if desktop.code.isEmpty { desktop.code = game.code }
         }
 
-        switch consoleType {
-        case .nes, .famicom:
-            desktop.exec = "/bin/clover-kachikachi-wr \(romConsolePath) \(Self.nesDefaultArgs)"
-        case .snesUsa, .snesEur, .superFamicom, .superFamicomShonenJump:
-            desktop.exec = "/bin/clover-canoe-shvc-wr -rom \(romConsolePath) --volume 100 -rollback-snapshot-period 600"
-        default:
-            desktop.exec = romConsolePath
-        }
-
+        let storageParent = (storagePath as NSString).deletingLastPathComponent
+        desktop.rebaseGamePaths(to: storageParent)
         desktop.profilePath = "/var/saves"
         desktop.omitProfilePathCode = false
         // Icon={iconPath}/{code}/{iconFilename} — iconPath is .storage parent
-        let storageParent = (storagePath as NSString).deletingLastPathComponent
         desktop.iconPath = storageParent
         desktop.iconFilename = "\(game.code).png"
+        desktop.snesExtraFields = false
+        desktop.normalizeForSave()
 
         return desktop.toData()
     }
@@ -371,5 +385,17 @@ actor GameSyncService {
         CGImageDestinationAddImage(dest, image, nil)
         guard CGImageDestinationFinalize(dest) else { return Data() }
         return data as Data
+    }
+}
+
+enum SyncError: LocalizedError {
+    case missingRoms([String])
+
+    var errorDescription: String? {
+        switch self {
+        case .missingRoms(let names):
+            let list = names.prefix(10).joined(separator: ", ") + (names.count > 10 ? ", …" : "")
+            return "\(names.count) selected game(s) have no ROM file on this Mac, so syncing would delete them from the console: \(list). Remove them from the console bar, or import them from the console again."
+        }
     }
 }

@@ -59,10 +59,16 @@ struct FileCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("Add ROMs...") {
+            Button("Add Games...") {
                 appState.addROMs()
             }
             .keyboardShortcut("o")
+
+            Button("Add Games As-Is...") {
+                appState.addROMs(asIs: true)
+            }
+            .keyboardShortcut("o", modifiers: [.command, .option])
+            .help("Import files untouched: no archive unpacking and no ROM conversion")
 
             Button("Import from Console") {
                 Task { await appState.importFromConsole() }
@@ -120,6 +126,14 @@ struct GameCommands: Commands {
                 appState.selectPreviousGame()
             }
             .keyboardShortcut(.upArrow, modifiers: [])
+
+            Divider()
+
+            Button("Select Emulation Core...") {
+                appState.openCoreDialog(for: appState.selectedGames)
+            }
+            .keyboardShortcut("e")
+            .disabled(appState.selectedGames.allSatisfy { $0.source != .local })
 
             Divider()
 
@@ -200,6 +214,14 @@ struct ToolsCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Tools") {
+            Button("Select Emulation Core...") {
+                appState.openCoreDialog(for: appState.selectedGames)
+            }
+            .keyboardShortcut("e")
+            .disabled(appState.selectedGames.allSatisfy { $0.source != .local })
+
+            Divider()
+
             Button("Scraper...") {
                 appState.showScraper = true
             }

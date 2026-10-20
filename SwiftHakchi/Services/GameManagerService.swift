@@ -21,6 +21,9 @@ final class GameManagerService: ObservableObject {
         let gamesDir = config.gamesDirectory
         var loadedGames: [Game] = []
 
+        // Fix games imported by older versions (unsafe file names, missing metadata.json)
+        GameRepair.migrateLegacyGames(in: gamesDir, cores: CoreCatalog.shared)
+
         if FileManager.default.fileExists(atPath: gamesDir.path),
            let contents = try? FileManager.default.contentsOfDirectory(
                at: gamesDir, includingPropertiesForKeys: nil
@@ -39,12 +42,15 @@ final class GameManagerService: ObservableObject {
                     desktop.code = dir.lastPathComponent
                 }
 
-                let game = Game(
+                var game = Game(
                     desktopFile: desktop,
                     consoleType: config.lastConsoleType,
                     basePath: gamesDir.path,
                     source: .local
                 )
+                let meta = GameMetadata.load(gameDirectory: dir, exec: desktop.exec)
+                game.system = meta.system
+                game.core = meta.core
                 loadedGames.append(game)
             }
         }
@@ -489,9 +495,18 @@ final class GameManagerService: ObservableObject {
             let gameDir = gamesDir.appendingPathComponent(code)
             try? FileManager.default.createDirectory(at: gameDir, withIntermediateDirectories: true)
 
-            // 4. Save .desktop file
+            // 4. Save .desktop file with paths normalized to /var/games (like CE's importer),
+            //    plus metadata.json with the guessed system and core
+            let desktop = DesktopFile(string: content)
+            if desktop.code.isEmpty { desktop.code = code }
+            desktop.rebaseGamePaths(to: "/var/games")
+            desktop.profilePath = "/var/saves"
+            desktop.iconPath = "/var/games"
             let desktopPath = gameDir.appendingPathComponent("\(code).desktop")
-            try? content.data(using: .utf8)?.write(to: desktopPath)
+            try? desktop.toData().write(to: desktopPath)
+            var meta = GameMetadata.load(gameDirectory: gameDir, exec: desktop.exec)
+            meta.core = CoreCatalog.shared.core(forExec: desktop.exec)?.bin ?? ""
+            try? meta.save(gameDirectory: gameDir)
 
             // 5. Download ROM via base64 encoding
             if let romFile = romFilename {
@@ -525,8 +540,6 @@ final class GameManagerService: ObservableObject {
             }
 
             // 7. Create local Game, replacing any .console entry
-            let desktop = DesktopFile(string: content)
-            if desktop.code.isEmpty { desktop.code = code }
             var game = Game(
                 desktopFile: desktop,
                 consoleType: consoleType,
@@ -535,6 +548,8 @@ final class GameManagerService: ObservableObject {
             )
             game.isSelected = true
             game.isOnConsole = true
+            game.system = meta.system
+            game.core = meta.core
 
             // Remove the old .console entry if it exists, replace with .local
             games.removeAll { $0.id == code && $0.source != .local }
@@ -558,84 +573,64 @@ final class GameManagerService: ObservableObject {
 
     // MARK: - Import ROMs
 
-    /// Import ROM files via file picker results
-    func importROMs(urls: [URL], consoleType: ConsoleType) {
+    /// Import ROM files, archives, game folders (.desktop) and .clvg game archives.
+    /// Returns the codes of imported games whose system could not be detected
+    /// (Hakchi2-CE opens the emulation core dialog for those).
+    @discardableResult
+    func importROMs(urls: [URL], consoleType: ConsoleType, asIs: Bool = false,
+                    chooseFile: @escaping GameImporter.FileChooser,
+                    ask: @escaping GameImporter.Asker) -> (imported: [String], unknownSystem: [String], errors: [String]) {
         let gamesDir = config.gamesDirectory
-        try? FileManager.default.createDirectory(at: gamesDir, withIntermediateDirectories: true)
+        let importer = GameImporter(gamesDirectory: gamesDir, patchesDirectory: config.patchesDirectory,
+                                    cores: CoreCatalog.shared, chooseFile: chooseFile, ask: ask)
+        var options = GameImporter.Options()
+        options.asIs = asIs
+        options.consoleType = consoleType
+        options.convertToSfrom = config.convertToSfrom
+        let report = importer.importFiles(urls, options: options)
 
-        for url in urls {
-            // Compute CRC32 (with header stripping) for deterministic code + DB lookup
-            let romCrc = CRC32.romChecksum(file: url)
-            let code = generateCode(for: consoleType, crc32: romCrc)
+        for imported in report.imported {
+            let code = imported.code
+            let gameDir = imported.directory
+            let desktopURL = gameDir.appendingPathComponent("\(code).desktop")
+            guard let desktopData = try? Data(contentsOf: desktopURL) else { continue }
+            let desktop = DesktopFile(data: desktopData)
 
-            // Skip if this game is already imported (same deterministic code)
-            if games.contains(where: { $0.id == code }) {
-                logger.info("Skipping duplicate ROM: \(url.lastPathComponent) (code \(code))")
-                continue
-            }
-
-            let gameDir = gamesDir.appendingPathComponent(code)
-            try? FileManager.default.createDirectory(at: gameDir, withIntermediateDirectories: true)
-
-            // Copy ROM
-            let romDest = gameDir.appendingPathComponent(url.lastPathComponent)
-            try? FileManager.default.copyItem(at: url, to: romDest)
-
-            // Create .desktop file
-            let desktop = DesktopFile()
-            desktop.code = code
-            // Try auto-matching via bundled game database (CRC32 lookup)
-            var coverUrl: String?
-            if let dbEntry = GameDatabase.shared.lookup(romURL: url), !dbEntry.name.isEmpty {
+            // Autofill from the bundled databases (CRC32 lookup on the imported ROM)
+            let romURL = desktop.romPath.map { gameDir.appendingPathComponent(($0 as NSString).lastPathComponent) }
+            let dbEntry = romURL.flatMap { GameDatabase.shared.lookup(romURL: $0) }
+            if let dbEntry, !dbEntry.name.isEmpty {
                 desktop.name = dbEntry.name
-                desktop.publisher = dbEntry.publisher ?? "UNKNOWN"
-                desktop.releaseDate = dbEntry.releaseDate ?? "1990-01-01"
-                desktop.players = dbEntry.players ?? 1
-                coverUrl = dbEntry.coverUrl
+                desktop.sortName = ""
+                desktop.publisher = dbEntry.publisher ?? desktop.publisher
+                desktop.releaseDate = dbEntry.releaseDate ?? desktop.releaseDate
+                desktop.players = dbEntry.players ?? desktop.players
+                desktop.normalizeForSave()
+                try? desktop.toData().write(to: desktopURL)
                 logger.info("Auto-matched ROM: \(dbEntry.name)")
-            } else {
-                desktop.name = cleanTitle(url.deletingPathExtension().lastPathComponent)
-                desktop.releaseDate = "1990-01-01"
-                desktop.publisher = "UNKNOWN"
-                desktop.players = 1
-                // Still grab cover URL even without full metadata (romfiles.xml match)
-                if let dbEntry = GameDatabase.shared.lookup(romURL: url) {
-                    coverUrl = dbEntry.coverUrl
-                }
             }
-            desktop.exec = defaultExec(for: consoleType, rom: url.lastPathComponent, code: code)
-            desktop.profilePath = "/var/saves"
-            desktop.iconPath = "/var/games"
-            desktop.iconFilename = "\(code).png"
-            desktop.snesExtraFields = consoleType.isSNES
 
-            let desktopPath = gameDir
-                .appendingPathComponent(code)
-                .appendingPathExtension("desktop")
-            try? desktop.toData().write(to: desktopPath)
-
-            let game = Game(
-                desktopFile: desktop,
-                consoleType: consoleType,
-                basePath: gamesDir.path,
-                source: .local
-            )
+            var game = Game(desktopFile: desktop, consoleType: consoleType, basePath: gamesDir.path, source: .local)
+            let meta = GameMetadata.load(gameDirectory: gameDir, exec: desktop.exec)
+            game.system = meta.system
+            game.core = meta.core
+            games.removeAll { $0.id == code }
             games.append(game)
 
-            // Download cover art in background if available
-            if let artUrl = coverUrl {
+            if let artUrl = dbEntry?.coverUrl {
                 downloadCoverArt(urlString: artUrl, gameCode: code, gameDir: gameDir)
             }
-
-            // Enrich from TGDB if API key is configured
-            if !config.theGamesDbApiKey.isEmpty,
-               let tgdbId = GameDatabase.shared.tgdbId(forROM: url) {
-                let gameIndex = games.count - 1
+            if !config.theGamesDbApiKey.isEmpty, let romURL,
+               let tgdbId = GameDatabase.shared.tgdbId(forROM: romURL),
+               let gameIndex = games.firstIndex(where: { $0.id == code }) {
                 enrichSingleGame(at: gameIndex, tgdbId: tgdbId, apiKey: config.theGamesDbApiKey)
             }
         }
 
         games.sort { $0.name.localizedCompare($1.name) == .orderedAscending }
+        return (report.imported.map(\.code),
+                report.imported.filter(\.unknownSystem).map(\.code),
+                report.errors + report.warnings)
     }
 
     // MARK: - Delete Games
@@ -823,17 +818,17 @@ final class GameManagerService: ObservableObject {
         }
     }
 
-    /// Save a game's .desktop file back to disk
+    /// Save a game's .desktop file and metadata.json back to disk.
+    /// Starts from the file on disk so fields the editor doesn't show are kept.
     func saveGame(_ game: Game) {
         guard game.source == .local else { return } // only save local games
 
-        let gamesDir = config.gamesDirectory
-        let gameDir = gamesDir.appendingPathComponent(game.code)
+        let gameDir = config.gamesDirectory.appendingPathComponent(game.code)
         let desktopPath = gameDir
             .appendingPathComponent(game.code)
             .appendingPathExtension("desktop")
 
-        let desktop = DesktopFile()
+        let desktop = (try? Data(contentsOf: desktopPath)).map(DesktopFile.init(data:)) ?? DesktopFile()
         desktop.code = game.code
         desktop.name = game.name
         desktop.sortName = game.sortName
@@ -847,96 +842,32 @@ final class GameManagerService: ObservableObject {
         desktop.exec = game.commandLine
         desktop.saveCount = game.saveCount
         desktop.testId = game.testId
-        desktop.snesExtraFields = game.consoleType.isSNES
+        desktop.cePrefix = game.cePrefix
+        desktop.country = game.country
         desktop.profilePath = "/var/saves"
         desktop.iconPath = "/var/games"
-        desktop.iconFilename = "\(game.code).png"
+        if desktop.iconFilename == nil { desktop.iconFilename = "\(game.code).png" }
+        // CE writes the SNES-only fields for stock games only
+        desktop.snesExtraFields = false
+        desktop.normalizeForSave()
 
         try? desktop.toData().write(to: desktopPath)
-    }
 
-    // MARK: - Title Cleanup
+        var meta = GameMetadata.load(gameDirectory: gameDir, exec: desktop.exec)
+        meta.system = game.system
+        meta.core = game.core
+        try? meta.save(gameDirectory: gameDir)
 
-    /// Clean a ROM filename into a presentable game title
-    private func cleanTitle(_ filename: String) -> String {
-        var title = filename
-
-        // 1. Remove bracketed/parenthesized tags: [USA], [!], (Rev A), (U), etc.
-        title = title.replacingOccurrences(
-            of: #"\s*[\[\(][^\]\)]*[\]\)]"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // 2. Replace _ and - with spaces
-        title = title.replacingOccurrences(of: "_", with: " ")
-        title = title.replacingOccurrences(of: "-", with: " ")
-
-        // 3. Collapse multiple spaces and trim
-        title = title.replacingOccurrences(
-            of: #"\s{2,}"#, with: " ", options: .regularExpression
-        ).trimmingCharacters(in: .whitespaces)
-
-        // 4. Title-case with special handling
-        let romanNumerals: Set<String> = ["II", "III", "IV", "VI", "VII", "VIII", "IX", "XI", "XII"]
-        let smallWords: Set<String> = ["a", "an", "the", "and", "or", "of", "in", "on", "at", "to", "for", "is", "by"]
-
-        let words = title.components(separatedBy: " ")
-        let titleCased = words.enumerated().map { index, word -> String in
-            let upper = word.uppercased()
-            if romanNumerals.contains(upper) {
-                return upper
-            }
-            if index > 0 && smallWords.contains(word.lowercased()) {
-                return word.lowercased()
-            }
-            if word.isEmpty { return word }
-            return word.prefix(1).uppercased() + word.dropFirst().lowercased()
+        // Keep the in-memory copy in sync with what was written
+        if let i = games.firstIndex(where: { $0.id == game.id }) {
+            var updated = game
+            updated.name = desktop.name
+            updated.sortName = desktop.sortName
+            games[i] = updated
         }
-
-        return titleCased.joined(separator: " ")
     }
 
     // MARK: - Helpers
-
-    /// Generate a deterministic CLV code from a CRC32, matching Hakchi2-CE's algorithm.
-    /// Falls back to random if no CRC is available.
-    private func generateCode(for consoleType: ConsoleType, crc32: UInt32? = nil) -> String {
-        let prefixChar: Character
-        switch consoleType {
-        case .nes, .famicom: prefixChar = "H"
-        case .snesUsa, .snesEur, .superFamicom, .superFamicomShonenJump: prefixChar = "U"
-        default: prefixChar = "P"
-        }
-
-        let suffix: String
-        if let crc = crc32 {
-            // Deterministic: derive 5 letters from CRC32 bits (matches Hakchi2-CE)
-            let c0 = Character(UnicodeScalar(UInt32(Character("A").asciiValue!) + (crc % 26))!)
-            let c1 = Character(UnicodeScalar(UInt32(Character("A").asciiValue!) + ((crc >> 5) % 26))!)
-            let c2 = Character(UnicodeScalar(UInt32(Character("A").asciiValue!) + ((crc >> 10) % 26))!)
-            let c3 = Character(UnicodeScalar(UInt32(Character("A").asciiValue!) + ((crc >> 15) % 26))!)
-            let c4 = Character(UnicodeScalar(UInt32(Character("A").asciiValue!) + ((crc >> 20) % 26))!)
-            suffix = String([c0, c1, c2, c3, c4])
-        } else {
-            // Fallback: random
-            let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            suffix = (0..<5).map { _ in String(chars.randomElement()!) }.joined()
-        }
-
-        return "CLV-\(prefixChar)-\(suffix)"
-    }
-
-    private func defaultExec(for consoleType: ConsoleType, rom: String, code: String) -> String {
-        switch consoleType {
-        case .nes, .famicom:
-            return "/bin/clover-kachikachi-wr /var/games/\(code)/\(rom) --volume 75 --rollback-snapshot-period 720"
-        case .snesUsa, .snesEur, .superFamicom, .superFamicomShonenJump:
-            return "/bin/clover-canoe-shvc-wr -rom /var/games/\(code)/\(rom) --volume 75 --rollback-snapshot-period 720"
-        default:
-            return "/bin/\(rom)"
-        }
-    }
 
     // MARK: - TGDB Library Enrichment
 

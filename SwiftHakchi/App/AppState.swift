@@ -47,10 +47,17 @@ final class AppState: ObservableObject {
     let deviceManager = DeviceManager()
     let gameManager = GameManagerService()
     let taskRunner = TaskRunner()
-    let payloads = PayloadService.shared
+    nonisolated let payloads = PayloadService.shared
 
     // MARK: - UI State
+    /// Game shown in the detail panel (the last one clicked)
     @Published var selectedGame: Game?
+    /// All games selected in the explorer (⌘/⇧-click); always contains `selectedGame`
+    @Published var selectedGameIds: Set<String> = []
+    /// Anchor for ⇧-click range selection
+    var selectionAnchorId: String?
+    /// Games shown in the "Select emulation core" sheet (nil = sheet closed)
+    @Published var coreDialogGameIds: [String]?
     @Published var searchText = ""
     @Published var showScraper = false
     @Published var showModuleManager = false
@@ -154,6 +161,12 @@ final class AppState: ObservableObject {
         let deviceId = deviceManager.uniqueId
 
         statusMessage = "Refreshing console status..."
+        // Cache the console's installed cores for the core dialog (works offline afterwards)
+        do {
+            try await CoreCatalog.shared.refreshFromConsole(shell: shell)
+        } catch {
+            logger.warning("Core refresh failed: \(error.localizedDescription)")
+        }
         await gameManager.pullGamesFromConsole(shell: shell, consoleType: consoleType, deviceId: deviceId)
         gameManager.matchExistingGames()
         statusMessage = nil
@@ -601,27 +614,6 @@ final class AppState: ObservableObject {
                 gameManager.games[i].isSelected = true
             }
         }
-    }
-
-    // MARK: - ROM import
-
-    func addROMs() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [
-            .init(filenameExtension: "nes")!,
-            .init(filenameExtension: "sfc")!,
-            .init(filenameExtension: "smc")!,
-            .init(filenameExtension: "md")!,
-            .init(filenameExtension: "bin")!,
-            .init(filenameExtension: "zip")!,
-        ]
-        guard panel.runModal() == .OK else { return }
-        gameManager.importROMs(
-            urls: panel.urls,
-            consoleType: deviceManager.consoleType
-        )
     }
 
     // MARK: - Filtered games

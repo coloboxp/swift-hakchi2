@@ -5,7 +5,7 @@ struct GameGridView: View {
     @EnvironmentObject var appState: AppState
     @Binding var isDraggingFromExplorer: Bool
     @Binding var selectionSource: SelectionSource
-    @State private var gameToDelete: Game?
+    @State private var gamesToDelete: [Game] = []
 
     /// Only custom (non-stock) games in the explorer
     private var customGames: [Game] {
@@ -65,11 +65,14 @@ struct GameGridView: View {
                             GameCardView(
                                 game: game,
                                 isActive: game == appState.selectedGame && selectionSource == .explorer,
+                                isMultiSelected: appState.selectedGameIds.count > 1
+                                    && appState.selectedGameIds.contains(game.id),
                                 isOnBar: game.isSelected,
                                 cardSize: cardSize
                             )
                             .onTapGesture {
-                                appState.selectedGame = game
+                                // ⌘-click toggles, ⇧-click selects a range (like Finder)
+                                appState.select(game, modifiers: NSEvent.modifierFlags)
                                 selectionSource = .explorer
                             }
                             .onDrag {
@@ -77,11 +80,7 @@ struct GameGridView: View {
                                 return NSItemProvider(object: game.id as NSString)
                             }
                             .contextMenu {
-                                if game.source == .local {
-                                    Button("Delete Game...") {
-                                        gameToDelete = game
-                                    }
-                                }
+                                gameContextMenu(for: game)
                             }
                         }
                     }
@@ -105,24 +104,45 @@ struct GameGridView: View {
                 }
             }
         }
-        .alert("Delete Game", isPresented: Binding(
-            get: { gameToDelete != nil },
-            set: { if !$0 { gameToDelete = nil } }
-        )) {
+        .alert(gamesToDelete.count > 1 ? "Delete \(gamesToDelete.count) Games" : "Delete Game",
+               isPresented: Binding(
+                   get: { !gamesToDelete.isEmpty },
+                   set: { if !$0 { gamesToDelete = [] } }
+               )) {
             Button("Delete", role: .destructive) {
-                if let game = gameToDelete {
-                    if appState.selectedGame?.id == game.id {
-                        appState.selectedGame = nil
-                    }
-                    appState.gameManager.deleteGame(game)
-                    gameToDelete = nil
+                for game in gamesToDelete {
+                    appState.selectedGameIds.remove(game.id)
+                    if appState.selectedGame?.id == game.id { appState.selectedGame = nil }
                 }
+                appState.gameManager.deleteGames(gamesToDelete)
+                gamesToDelete = []
             }
             Button("Cancel", role: .cancel) {
-                gameToDelete = nil
+                gamesToDelete = []
             }
         } message: {
-            Text("Are you sure you want to delete \"\(gameToDelete?.name ?? "")\"? This removes the imported copy from the app library. Your original ROM file is not affected.")
+            let what = gamesToDelete.count > 1 ? "these \(gamesToDelete.count) games" : "\"\(gamesToDelete.first?.name ?? "")\""
+            Text("Are you sure you want to delete \(what)? This removes the imported copy from the app library. Your original ROM files are not affected.")
         }
+    }
+
+    /// Right-click menu; commands apply to the whole selection when the clicked game is in it
+    @ViewBuilder
+    private func gameContextMenu(for game: Game) -> some View {
+        let targets = appState.contextTargets(for: game)
+        let local = targets.filter { $0.source == .local }
+        let suffix = targets.count > 1 ? " (\(targets.count) games)" : ""
+
+        Button("Select Emulation Core...\(suffix)") {
+            appState.openCoreDialog(for: local)
+        }
+        .disabled(local.isEmpty)
+
+        Divider()
+
+        Button("Delete\(targets.count > 1 ? " \(local.count) Games" : " Game")...") {
+            gamesToDelete = local
+        }
+        .disabled(local.isEmpty)
     }
 }
