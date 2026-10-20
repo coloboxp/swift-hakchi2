@@ -149,6 +149,7 @@ struct ContentView: View {
             SelectCoreView(gameIds: appState.coreDialogGameIds ?? [])
                 .environmentObject(appState)
         }
+        .modifier(LibrarySheets())
         .sheet(isPresented: $appState.showModuleManager) {
             ModuleManagerView()
                 .environmentObject(appState)

@@ -44,6 +44,13 @@ extension AppState {
         if !result.unknownSystem.isEmpty {
             coreDialogGameIds = result.unknownSystem
         }
+        // CE's SelectCoverDialog for games with several possible covers in art/
+        let candidates = gameManager.importCoverCandidates
+        gameManager.importCoverCandidates = [:]
+        coverChoices = candidates.compactMap { code, urls in
+            gameManager.games.first { $0.id == code }.map { CoverChoice(code: code, name: $0.name, candidates: urls) }
+        }
+        .sorted { $0.name < $1.name }
     }
 
     /// Let the user pick the ROM inside an archive with several candidates
@@ -76,9 +83,17 @@ extension AppState {
 
     // MARK: - Selection
 
+    /// Explorer sections, following the View options (original games, sorting, grouping)
+    var explorerSections: [ExplorerSection] {
+        ExplorerGrouping.sections(for: filteredGames, settings: LibrarySettings.shared.values) { game in
+            CoreCatalog.shared.core(game.core)?.name ?? CoreCatalog.shared.core(forExec: game.commandLine)?.name
+                ?? "Unknown Core"
+        }
+    }
+
     /// Explorer games in display order (used for ⇧-click ranges)
     var explorerGames: [Game] {
-        filteredGames.filter { !$0.isStock }
+        explorerSections.flatMap(\.games)
     }
 
     /// Games currently selected in the explorer, in display order

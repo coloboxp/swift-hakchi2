@@ -119,6 +119,8 @@ actor ScraperService {
         components.queryItems = [
             URLQueryItem(name: "apikey", value: apiKey),
             URLQueryItem(name: "name", value: name),
+            URLQueryItem(name: "fields", value: "players,publishers,genres,overview"),
+            URLQueryItem(name: "include", value: "boxart"),
         ]
         if let platform {
             components.queryItems?.append(URLQueryItem(name: "filter[platform]", value: "\(platform)"))
@@ -130,19 +132,26 @@ actor ScraperService {
 
         logger.info("Searching TheGamesDB: \(name)")
         let (data, _) = try await URLSession.shared.data(from: url)
-        let response = try JSONDecoder().decode(GamesResponse.self, from: data)
+        let response = try JSONDecoder().decode(GamesByIdResponse.self, from: data)
+        let publisherNames = await publisherNames(apiKey: apiKey)
+        let baseUrl = response.include?.boxart?.base_url.original
+        let imageMap = response.include?.boxart?.data ?? [:]
 
         return response.data.games.map { game in
-            SearchResult(
+            var boxart: String?
+            if let base = baseUrl, let front = imageMap["\(game.id)"]?.first(where: { $0.type == "boxart" && $0.side == "front" }) {
+                boxart = base + front.filename
+            }
+            return SearchResult(
                 id: game.id,
                 title: game.game_title,
                 releaseDate: game.release_date,
                 platform: nil,
                 overview: game.overview,
                 players: game.players,
-                publisher: nil,
-                genre: nil,
-                boxartURL: nil
+                publisher: game.publishers?.compactMap { publisherNames[$0] }.first,
+                genre: GenreCatalog.genre(forGamesDbIds: game.genres ?? [])?.desktopName,
+                boxartURL: boxart
             )
         }
     }
@@ -182,6 +191,43 @@ actor ScraperService {
         guard let url = URL(string: urlString) else { return nil }
         let (data, _) = try await URLSession.shared.data(from: url)
         return data
+    }
+
+    // MARK: - Publishers
+
+    private var cachedPublishers: [Int: String]?
+
+    /// TheGamesDB publisher names by ID. The list rarely changes, so it is cached
+    /// on disk for a week (cache/thegamesdb/publishers.json).
+    func publisherNames(apiKey: String) async -> [Int: String] {
+        if let cachedPublishers { return cachedPublishers }
+        let cacheFile = AppConfig.configDirectory.appendingPathComponent("cache/thegamesdb/publishers.json")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheFile.path),
+           let date = attrs[.modificationDate] as? Date, Date().timeIntervalSince(date) < 7 * 24 * 3600,
+           let data = try? Data(contentsOf: cacheFile),
+           let map = try? JSONDecoder().decode([Int: String].self, from: data) {
+            cachedPublishers = map
+            return map
+        }
+
+        struct PublishersResponse: Codable {
+            struct Payload: Codable {
+                struct Publisher: Codable { let id: Int; let name: String }
+                let publishers: [String: Publisher]
+            }
+            let data: Payload
+        }
+        var components = URLComponents(string: "https://api.thegamesdb.net/v1/Publishers")!
+        components.queryItems = [URLQueryItem(name: "apikey", value: apiKey)]
+        guard let url = components.url,
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let response = try? JSONDecoder().decode(PublishersResponse.self, from: data) else { return [:] }
+
+        let map = Dictionary(response.data.publishers.values.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        try? FileManager.default.createDirectory(at: cacheFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(map).write(to: cacheFile)
+        cachedPublishers = map
+        return map
     }
 
     // MARK: - Batch Fetch by ID
@@ -229,6 +275,7 @@ actor ScraperService {
         guard !ids.isEmpty else { return [:] }
 
         var results: [Int: GameInfo] = [:]
+        let publisherNames = await publisherNames(apiKey: apiKey)
         let batchSize = 20
         let batches = stride(from: 0, to: ids.count, by: batchSize).map {
             Array(ids[$0..<min($0 + batchSize, ids.count)])
@@ -278,8 +325,8 @@ actor ScraperService {
                     overview: game.overview,
                     releaseDate: game.release_date,
                     players: game.players,
-                    genres: game.genres?.map { String($0) },
-                    publishers: game.publishers?.map { String($0) },
+                    genres: GenreCatalog.genre(forGamesDbIds: game.genres ?? []).map { [$0.desktopName] },
+                    publishers: game.publishers?.compactMap { publisherNames[$0] },
                     boxartFrontURL: boxartURL
                 )
             }

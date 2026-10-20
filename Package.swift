@@ -67,6 +67,11 @@ let package = Package(
                 .copy("Resources/nescarts.xml"),
                 .copy("Resources/romfiles.xml"),
                 .copy("Resources/AppIcon.icns"),
+                .copy("Resources/BlankCovers"),
+                .copy("Resources/SpineTemplates"),
+                .copy("Resources/GameGenieDB.xml"),
+                .copy("Resources/desktop_entries.tar"),
+                .copy("Resources/original_art.tar"),
             ],
             linkerSettings: [
                 .linkedFramework("IOKit"),

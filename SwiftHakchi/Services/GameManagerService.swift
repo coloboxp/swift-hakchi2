@@ -9,6 +9,8 @@ private let logger = Logger(subsystem: "com.swifthakchi.app", category: "GameMan
 @MainActor
 final class GameManagerService: ObservableObject {
     @Published var games: [Game] = []
+    /// Ambiguous art/ matches from the last import (shown in the "Select box art" sheet)
+    @Published var importCoverCandidates: [String: [URL]] = [:]
     @Published var isLoading: Bool = false
 
     private let config = AppConfig.shared
@@ -617,11 +619,14 @@ final class GameManagerService: ObservableObject {
             games.removeAll { $0.id == code }
             games.append(game)
 
-            if let artUrl = dbEntry?.coverUrl {
+            // Covers like CE: art/ folder match, else blank cover (an online cover may replace it)
+            if !applyImportCover(imported, desktop: desktop, meta: meta), let artUrl = dbEntry?.coverUrl {
                 downloadCoverArt(urlString: artUrl, gameCode: code, gameDir: gameDir)
             }
-            if !config.theGamesDbApiKey.isEmpty, let romURL,
-               let tgdbId = GameDatabase.shared.tgdbId(forROM: romURL),
+            // Read the TheGamesDB ID before compression replaces the ROM file
+            let tgdbId = romURL.flatMap { GameDatabase.shared.tgdbId(forROM: $0) }
+            compressAfterImport(code: code, gameDirectory: gameDir)
+            if LibrarySettings.shared.values.enableImportScraper, !config.theGamesDbApiKey.isEmpty, let tgdbId,
                let gameIndex = games.firstIndex(where: { $0.id == code }) {
                 enrichSingleGame(at: gameIndex, tgdbId: tgdbId, apiKey: config.theGamesDbApiKey)
             }
@@ -1001,12 +1006,17 @@ final class GameManagerService: ObservableObject {
         // Fill publisher if default — also update name (was filename-derived)
         if games[i].publisher == "UNKNOWN" || games[i].publisher.isEmpty {
             games[i].name = info.title
+            if let publisher = info.publishers?.first, !publisher.isEmpty {
+                games[i].publisher = publisher.uppercased()
+            }
             changed = true
         }
 
-        // Fill genre if empty
-        if games[i].genre.isEmpty, let genres = info.genres, !genres.isEmpty {
-            games[i].genre = genres.joined(separator: ", ")
+        // Fill genre if empty, or replace TheGamesDB ID lists written by older versions
+        let currentGenre = GenreCatalog.normalized(games[i].genre)
+        if currentGenre != games[i].genre { games[i].genre = currentGenre; changed = true }
+        if games[i].genre.isEmpty, let genre = info.genres?.first, !genre.isEmpty {
+            games[i].genre = genre
             changed = true
         }
 
@@ -1086,6 +1096,10 @@ final class GameManagerService: ObservableObject {
         }
 
         guard !urls.isEmpty else { return }
+        let isLibraryGame = gameDir.deletingLastPathComponent().standardizedFileURL
+            == config.gamesDirectory.standardizedFileURL
+        let coverOptions = CoverArt.Options(quantize: LibrarySettings.shared.values.compressCoverArt,
+                                            centerThumbnail: LibrarySettings.shared.values.centerThumbnail)
 
         Task.detached(priority: .utility) { [urls] in
             for url in urls {
@@ -1099,8 +1113,13 @@ final class GameManagerService: ObservableObject {
                         continue // try next URL
                     }
 
-                    // Save original full-res image (sync service handles resizing at upload time)
-                    try data.write(to: coverPath)
+                    // Library games get CE's cover files (CODE.png, _small, _original);
+                    // stock-game covers in the cache folder are stored as downloaded
+                    if isLibraryGame {
+                        try CoverArt.setCover(data, gameDirectory: gameDir, code: gameCode, options: coverOptions)
+                    } else {
+                        try data.write(to: coverPath)
+                    }
                     logger.info("Cover art for \(gameCode): \(data.count) bytes")
 
                     ImageCache.shared.evict(coverPath.path)

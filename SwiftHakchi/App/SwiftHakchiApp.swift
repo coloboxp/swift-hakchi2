@@ -39,7 +39,10 @@ struct SwiftHakchiApp: App {
             KernelCommands(appState: appState)
             ModulesCommands(appState: appState)
             ToolsCommands(appState: appState)
-            HelpCommands(appState: appState)
+            Group {
+                HelpCommands(appState: appState)
+                LibraryCommands(appState: appState, settings: LibrarySettings.shared)
+            }
             CommandGroup(replacing: .toolbar) {}
             CommandGroup(replacing: .sidebar) {}
         }
