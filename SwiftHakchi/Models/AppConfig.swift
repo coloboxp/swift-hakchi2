@@ -13,7 +13,8 @@ final class AppConfig: ObservableObject, Codable {
     @Published var exportLinked: Bool = false
     @Published var maxGameSize: Int = 300  // MB
     @Published var theGamesDbApiKey: String = ""
-    @Published var modRepositoryURLs: [String] = ["https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/"]
+    /// Module repositories (CE: repos). Older configs stored only URLs (`modRepositoryURLs`).
+    @Published var modRepositories: [ModRepository] = [.kmfd]
     /// Convert SNES ROMs to Canoe's .sfrom format on import (CE: ConvertToSFROM, default on)
     @Published var convertToSfrom: Bool = true
     /// Sync, menu structure and console (cfg_*) settings
@@ -22,7 +23,7 @@ final class AppConfig: ObservableObject, Codable {
     enum CodingKeys: String, CodingKey {
         case lastConsoleType, lastDeviceId, installedGameCodes, separateGameStorage, forceNetwork
         case uploadCompressed, exportLinked, maxGameSize
-        case theGamesDbApiKey, modRepositoryURLs, convertToSfrom
+        case theGamesDbApiKey, modRepositoryURLs, modRepositories, convertToSfrom
         case sync
     }
 
@@ -39,8 +40,11 @@ final class AppConfig: ObservableObject, Codable {
         exportLinked = try container.decodeIfPresent(Bool.self, forKey: .exportLinked) ?? false
         maxGameSize = try container.decodeIfPresent(Int.self, forKey: .maxGameSize) ?? 300
         theGamesDbApiKey = try container.decodeIfPresent(String.self, forKey: .theGamesDbApiKey) ?? ""
-        modRepositoryURLs = try container.decodeIfPresent([String].self, forKey: .modRepositoryURLs)
-            ?? ["https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/"]
+        if let repos = try container.decodeIfPresent([ModRepository].self, forKey: .modRepositories) {
+            modRepositories = repos
+        } else if let urls = try container.decodeIfPresent([String].self, forKey: .modRepositoryURLs) {
+            modRepositories = urls.map(ModRepository.init(legacyURL:))
+        }
         convertToSfrom = try container.decodeIfPresent(Bool.self, forKey: .convertToSfrom) ?? true
         sync = try container.decodeIfPresent(SyncSettings.self, forKey: .sync) ?? SyncSettings()
     }
@@ -56,7 +60,7 @@ final class AppConfig: ObservableObject, Codable {
         try container.encode(exportLinked, forKey: .exportLinked)
         try container.encode(maxGameSize, forKey: .maxGameSize)
         try container.encode(theGamesDbApiKey, forKey: .theGamesDbApiKey)
-        try container.encode(modRepositoryURLs, forKey: .modRepositoryURLs)
+        try container.encode(modRepositories, forKey: .modRepositories)
         try container.encode(convertToSfrom, forKey: .convertToSfrom)
         try container.encode(sync, forKey: .sync)
     }
@@ -99,6 +103,11 @@ final class AppConfig: ObservableObject, Codable {
     /// Path for downloaded data files
     var dataDirectory: URL {
         Self.configDirectory.appendingPathComponent("data", isDirectory: true)
+    }
+
+    /// Local module library (CE's user_mods): .hmod files or folders
+    var userModsDirectory: URL {
+        Self.configDirectory.appendingPathComponent("user_mods", isDirectory: true)
     }
 
     /// IPS patches matched to ROMs at import time (by CRC32 or file name)
