@@ -171,6 +171,14 @@ extension AppState {
         }
     }
 
+    func canCompress(_ game: Game) -> Bool {
+        game.source == .local && GameCompression.canCompress(gameDirectory: gameManager.gameDirectory(game), code: game.code)
+    }
+
+    func canDecompress(_ game: Game) -> Bool {
+        game.source == .local && GameCompression.canDecompress(gameDirectory: gameManager.gameDirectory(game), code: game.code)
+    }
+
     func compressGames(_ games: [Game], compress: Bool) {
         let errors = gameManager.compressGames(localCodes(games), compress: compress)
         showErrors(errors, title: compress ? "Some games could not be compressed" : "Some games could not be decompressed")
@@ -220,6 +228,7 @@ extension AppState {
         let fm = FileManager.default
         let imageExts: Set<String> = ["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff"]
         var games: [URL] = []
+        var modules: [URL] = []
 
         // A single image sets the box art of the selected game
         if urls.count == 1, imageExts.contains(urls[0].pathExtension.lowercased()) {
@@ -234,33 +243,39 @@ extension AppState {
             case "hrepo":
                 addRepository(from: url)
             case "hmod":
-                showModuleManager = true
-                statusMessage = "Use \"Install from File...\" in the Module Manager to install \(url.lastPathComponent)"
+                modules.append(url)
             case let ext where ["zip", "7z"].contains(ext) && archiveContainsHmod(url):
-                showModuleManager = true
-                statusMessage = "\(url.lastPathComponent) contains modules. Extract it and use \"Install from File...\"."
+                modules.append(url)
             default:
                 var isDir: ObjCBool = false
                 if fm.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue { games.append(url) }
             }
         }
         if !games.isEmpty { importGames(urls: games) }
+        // CE copies dropped modules to user_mods and opens the module dialog
+        if !modules.isEmpty {
+            do {
+                let added = try ModLibrary.standard().add(urls: modules)
+                statusMessage = "Added \(added.count) module(s) to the library"
+                showModuleManager = true
+            } catch {
+                showErrors([error.localizedDescription], title: "Could not add the modules")
+            }
+        }
     }
 
     /// `.hrepo`: front matter with `Name:` and `Link:` (CE)
     func addRepository(from url: URL) {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
-        let meta = ModRepositoryService.parseFrontMatter(text)
-        guard let link = meta["Link"], !link.isEmpty else {
-            showErrors(["\(url.lastPathComponent) has no Link."], title: "Invalid repository file")
+        guard let text = try? String(contentsOf: url, encoding: .utf8), let repo = ModRepository.parseHrepo(text) else {
+            showErrors(["\(url.lastPathComponent) is not a valid .hrepo file."], title: "Invalid repository file")
             return
         }
         let config = AppConfig.shared
-        if !config.modRepositoryURLs.contains(link) {
-            config.modRepositoryURLs.append(link)
+        if !config.modRepositories.contains(where: { $0.url == repo.url }) {
+            config.modRepositories.append(repo)
             config.save()
         }
-        notifyDone("Added repository \(meta["Name"] ?? link).")
+        notifyDone("Added repository \(repo.name).")
     }
 
     private func archiveContainsHmod(_ url: URL) -> Bool {

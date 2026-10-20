@@ -164,10 +164,10 @@ struct GameMoreDetailsView: View {
             if game.source == .local {
                 HStack(spacing: 16) {
                     Toggle("Compressed", isOn: Binding(
-                        get: { GameCompression.isCompressed(exec: game.commandLine) },
+                        get: { appState.canDecompress(game) },
                         set: { appState.compressGames([game], compress: $0) }
                     ))
-                    .disabled(!GameCompression.isAvailable)
+                    .disabled(!appState.canCompress(game) && !appState.canDecompress(game))
                     Button("Game Genie...") { appState.gameGenieGameId = game.id }
                     Spacer()
                     Text("ID: \(game.code)").font(.caption).foregroundStyle(.secondary)

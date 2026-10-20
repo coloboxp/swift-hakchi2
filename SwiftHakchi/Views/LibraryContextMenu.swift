@@ -43,9 +43,9 @@ struct LibraryContextMenu: View {
         Button("Archive Selected Games...\(count)") { appState.archiveGames(local) }
             .disabled(local.isEmpty)
         Button("Compress Selected Games") { appState.compressGames(local, compress: true) }
-            .disabled(local.isEmpty || !GameCompression.isAvailable)
+            .disabled(!local.contains { appState.canCompress($0) })
         Button("Decompress Selected Games") { appState.compressGames(local, compress: false) }
-            .disabled(local.isEmpty || !GameCompression.isAvailable)
+            .disabled(!local.contains { appState.canDecompress($0) })
         Button("Repair Games") { appState.repairGames(local) }
             .disabled(local.isEmpty)
         Button("Game Genie Codes...") { appState.gameGenieGameId = game.id }

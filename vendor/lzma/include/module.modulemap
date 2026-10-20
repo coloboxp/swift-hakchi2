@@ -1,0 +1,4 @@
+module LzmaSDK {
+    header "lzma_shim.h"
+    export *
+}

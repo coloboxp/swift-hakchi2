@@ -114,6 +114,7 @@ final class AppState: ObservableObject {
                     Task { await self.onConsoleConnected() }
                 } else {
                     self.gameManager.clearConsoleGames()
+                    BluetoothState.shared.isAvailable = false
                 }
             }
             .store(in: &cancellables)
@@ -177,6 +178,7 @@ final class AppState: ObservableObject {
         } catch {
             logger.warning("Core refresh failed: \(error.localizedDescription)")
         }
+        await BluetoothState.shared.check(shell: shell)  // shows the Bluetooth menu item
         await gameManager.pullGamesFromConsole(shell: shell, consoleType: consoleType, deviceId: deviceId)
         gameManager.matchExistingGames()
         statusMessage = nil

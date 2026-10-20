@@ -185,7 +185,8 @@ extension GameManagerService {
 
     /// CE: "Compress games when adding"
     func compressAfterImport(code: String, gameDirectory dir: URL) {
-        guard LibrarySettings.shared.values.compressGames, GameCompression.isAvailable else { return }
+        guard LibrarySettings.shared.values.compressGames,
+              GameCompression.canCompress(gameDirectory: dir, code: code) else { return }
         do {
             try GameCompression.compress(gameDirectory: dir, code: code)
             reloadGame(code)
@@ -244,7 +245,8 @@ extension GameManagerService {
                 let outcome = try GameRepair.repair(
                     gameDirectory: gameDirectory(game), code: code, cores: CoreCatalog.shared,
                     options: GameRepair.Options(preserveArgs: false, chooseFile: chooseFile))
-                if outcome != .skipped, LibrarySettings.shared.values.compressGames, GameCompression.isAvailable {
+                if outcome != .skipped, LibrarySettings.shared.values.compressGames,
+                   GameCompression.canCompress(gameDirectory: gameDirectory(game), code: code) {
                     try GameCompression.compress(gameDirectory: gameDirectory(game), code: code)
                 }
             } catch {

@@ -10,8 +10,7 @@ struct LibrarySettingsTab: View {
         Form {
             Section("When Adding Games") {
                 Toggle("Compress games (7z)", isOn: $settings.values.compressGames)
-                    .help(GameCompression.isAvailable ? "Store ROMs as .7z to save space on the console"
-                                                      : "Not available yet in this version")
+                    .help("Store ROMs up to 16 MB as .7z to save space on the console")
                 Toggle("Compress box art (8-bit colors)", isOn: $settings.values.compressCoverArt)
                 Toggle("Center box art thumbnail", isOn: $settings.values.centerThumbnail)
                 Toggle("Convert SNES ROMs to SFROM", isOn: $config.convertToSfrom)

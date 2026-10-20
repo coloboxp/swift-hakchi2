@@ -623,9 +623,10 @@ final class GameManagerService: ObservableObject {
             if !applyImportCover(imported, desktop: desktop, meta: meta), let artUrl = dbEntry?.coverUrl {
                 downloadCoverArt(urlString: artUrl, gameCode: code, gameDir: gameDir)
             }
+            // Read the TheGamesDB ID before compression replaces the ROM file
+            let tgdbId = romURL.flatMap { GameDatabase.shared.tgdbId(forROM: $0) }
             compressAfterImport(code: code, gameDirectory: gameDir)
-            if LibrarySettings.shared.values.enableImportScraper, !config.theGamesDbApiKey.isEmpty, let romURL,
-               let tgdbId = GameDatabase.shared.tgdbId(forROM: romURL),
+            if LibrarySettings.shared.values.enableImportScraper, !config.theGamesDbApiKey.isEmpty, let tgdbId,
                let gameIndex = games.firstIndex(where: { $0.id == code }) {
                 enrichSingleGame(at: gameIndex, tgdbId: tgdbId, apiKey: config.theGamesDbApiKey)
             }
