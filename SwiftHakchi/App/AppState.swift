@@ -136,6 +136,7 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         deviceManager.start()
+        startSelectionTracking()
     }
 
     // MARK: - Library Enrichment
@@ -167,6 +168,7 @@ final class AppState: ObservableObject {
         } catch {
             logger.warning("Core refresh failed: \(error.localizedDescription)")
         }
+        await refreshConsoleConfig()
         await gameManager.pullGamesFromConsole(shell: shell, consoleType: consoleType, deviceId: deviceId)
         gameManager.matchExistingGames()
         statusMessage = nil
@@ -521,27 +523,7 @@ final class AppState: ObservableObject {
     }
 
     private func performSync() {
-        guard deviceManager.isConnected, let shell = deviceManager.sshService else { return }
-        let consoleType = deviceManager.consoleType
-        showTaskProgress = true
-
-        taskRunner.run(name: "Syncing games") { [weak self] runner in
-            guard let self else { return }
-            let syncService = GameSyncService(
-                shell: shell,
-                consoleType: consoleType
-            )
-            try await syncService.syncGames(
-                games: self.gameManager.games,
-                gameSyncPath: "/var/lib/hakchi/games"
-            ) { status, progress in
-                runner.updateProgress(status: status, fraction: progress)
-            }
-
-            // Refresh installed status after sync completes
-            runner.updateProgress(status: "Verifying installed games...", fraction: 0.95)
-            await self.gameManager.refreshInstalledStatus(shell: shell, consoleType: consoleType)
-        }
+        startIncrementalSync()
     }
 
     // MARK: - Import from Console

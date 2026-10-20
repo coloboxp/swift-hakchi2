@@ -57,6 +57,8 @@ let package = Package(
                 .copy("Resources/nescarts.xml"),
                 .copy("Resources/romfiles.xml"),
                 .copy("Resources/AppIcon.icns"),
+                .copy("Resources/folder_images"),
+                .copy("Resources/splash.gz"),
             ],
             linkerSettings: [
                 .linkedFramework("IOKit"),

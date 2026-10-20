@@ -28,14 +28,17 @@ typedef struct {
 ssh_session_t *ssh_session_open(uint16_t vid, uint16_t pid,
                                  const char *host_ip, const char *remote_ip);
 
-/// Execute a command and capture stdout/stderr.
+/// Execute a command and capture stdout/stderr (binary-safe: stdout_len is exact).
+/// `timeout_ms` is an idle timeout: it restarts whenever output arrives, so long
+/// downloads work as long as data keeps flowing.
 /// Caller must call ssh_result_free() on the result.
 /// Returns 0 on success, negative on error.
 int ssh_exec(ssh_session_t *s, const char *command, ssh_exec_result_t *result,
              int timeout_ms);
 
 /// Execute a command with stdin data piped in (e.g., "cat > /path" or "tar -xvC /dir").
-/// Returns 0 on success, negative on error.
+/// Returns 0 on success, -2 if not all stdin data could be written, other negative
+/// values on error. `timeout_ms` is an idle timeout for reading the output.
 int ssh_exec_stdin(ssh_session_t *s, const char *command,
                     const uint8_t *stdin_data, uint32_t stdin_len,
                     ssh_exec_result_t *result, int timeout_ms);
