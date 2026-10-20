@@ -153,6 +153,7 @@ struct ContentView: View {
             ModuleManagerView()
                 .environmentObject(appState)
         }
+        .modifier(ModuleSheets(appState: appState))
         .sheet(isPresented: $appState.showHelp) {
             HelpView()
         }
