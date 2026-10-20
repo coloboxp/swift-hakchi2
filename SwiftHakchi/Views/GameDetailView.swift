@@ -38,6 +38,7 @@ struct GameDetailView: View {
             ScraperView(game: $game)
                 .environmentObject(appState)
         }
+        .modifier(GameAutoSave(game: $game))
     }
 
     // MARK: - Sections
@@ -53,6 +54,8 @@ struct GameDetailView: View {
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            GameArtworkView(game: game)
+
             LabeledContent("Name") {
                 TextField("Name", text: $game.name)
                     .textFieldStyle(.roundedBorder)
@@ -69,18 +72,7 @@ struct GameDetailView: View {
                     .frame(width: 120)
             }
 
-            HStack(spacing: 20) {
-                LabeledContent("Players") {
-                    Stepper("\(game.players)", value: $game.players, in: 1...4)
-                }
-
-                Toggle("Simultaneous", isOn: $game.simultaneous)
-            }
-
-            LabeledContent("Genre") {
-                TextField("Genre", text: $game.genre)
-                    .textFieldStyle(.roundedBorder)
-            }
+            GameMoreDetailsView(game: $game)
 
             LabeledContent("Console / Core") {
                 HStack {
