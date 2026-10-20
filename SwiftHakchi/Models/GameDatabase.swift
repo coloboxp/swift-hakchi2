@@ -41,8 +41,11 @@ final class GameDatabase {
     // MARK: - ROM Files Database (romfiles.xml — CRC32 → TGDB ID)
 
     private func loadRomFilesDatabase() {
-        guard let url = Bundle.appBundle.url(forResource: "romfiles", withExtension: "xml"),
-              let data = try? Data(contentsOf: url) else {
+        // A newer copy downloaded by UpdateService wins over the bundled one
+        let downloaded = AppConfig.shared.dataDirectory.appendingPathComponent("romfiles.xml")
+        let url = FileManager.default.fileExists(atPath: downloaded.path)
+            ? downloaded : Bundle.appBundle.url(forResource: "romfiles", withExtension: "xml")
+        guard let url, let data = try? Data(contentsOf: url) else {
             logger.warning("romfiles.xml not found in bundle")
             return
         }

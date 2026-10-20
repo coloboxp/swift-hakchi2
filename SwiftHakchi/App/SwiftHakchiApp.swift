@@ -48,6 +48,8 @@ struct SwiftHakchiApp: App {
             SettingsView()
                 .environmentObject(appState)
         }
+
+        ToolWindowScenes(appState: appState)
     }
 }
 
@@ -154,48 +156,6 @@ struct GameCommands: Commands {
     }
 }
 
-struct KernelCommands: Commands {
-    @ObservedObject var appState: AppState
-
-    var body: some Commands {
-        CommandMenu("Kernel") {
-            Button("Install / Repair") {
-                appState.requestFlash(.installHakchi)
-            }
-            .keyboardShortcut("i", modifiers: [.command, .shift])
-            .disabled(!appState.deviceManager.felDevicePresent)
-
-            Button("Uninstall") {
-                appState.requestFlash(.uninstallHakchi)
-            }
-
-            Button("Factory Reset") {
-                appState.requestFlash(.factoryReset)
-            }
-
-            Divider()
-
-            Button("Flash Custom Kernel") {
-                appState.requestFlash(.memboot)
-            }
-            .keyboardShortcut("k", modifiers: [.command, .shift])
-            .disabled(!appState.deviceManager.felDevicePresent)
-
-            Divider()
-
-            Button("Reboot") {
-                Task { await appState.rebootConsole() }
-            }
-            .disabled(!appState.deviceManager.isConnected)
-
-            Button("Shutdown") {
-                Task { await appState.shutdownConsole() }
-            }
-            .disabled(!appState.deviceManager.isConnected)
-        }
-    }
-}
-
 struct ModulesCommands: Commands {
     @ObservedObject var appState: AppState
 
@@ -205,46 +165,6 @@ struct ModulesCommands: Commands {
                 appState.showModuleManager = true
             }
             .keyboardShortcut("m", modifiers: [.command, .shift])
-        }
-    }
-}
-
-struct ToolsCommands: Commands {
-    @ObservedObject var appState: AppState
-
-    var body: some Commands {
-        CommandMenu("Tools") {
-            Button("Select Emulation Core...") {
-                appState.openCoreDialog(for: appState.selectedGames)
-            }
-            .keyboardShortcut("e")
-            .disabled(appState.selectedGames.allSatisfy { $0.source != .local })
-
-            Divider()
-
-            Button("Scraper...") {
-                appState.showScraper = true
-            }
-
-            Divider()
-
-            Button("Dump Stock Kernel") {
-                appState.requestFlash(.dumpStockKernel)
-            }
-            .disabled(!appState.deviceManager.isConnected)
-        }
-    }
-}
-
-struct HelpCommands: Commands {
-    @ObservedObject var appState: AppState
-
-    var body: some Commands {
-        CommandGroup(replacing: .help) {
-            Button("Swift Hakchi2 Help") {
-                appState.showHelp = true
-            }
-            .keyboardShortcut("?")
         }
     }
 }

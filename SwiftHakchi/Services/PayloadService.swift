@@ -109,6 +109,54 @@ final class PayloadService: @unchecked Sendable {
         throw PayloadError.entryNotFound(path)
     }
 
+    /// Any file inside hakchi.hmod (e.g. "bin/detached-fallback", "var/version")
+    func hmodFile(_ path: String) throws -> Data {
+        try extractFromHmod(path: path)
+    }
+
+    /// Forget the cached hakchi.hmod and everything extracted from it
+    /// (after a newer data/hakchi-latest.hmod was downloaded)
+    func clearHakchiHmodCache() {
+        lock.withLock {
+            cachedHakchiHmod = nil
+            cachedUboot = nil
+            cachedBootImg = nil
+        }
+    }
+
+    /// A bundled resource by relative path, e.g. "tools/arm/kexec.static"
+    func bundledFile(_ relativePath: String) throws -> Data {
+        let ns = relativePath as NSString
+        let dir = ns.deletingLastPathComponent
+        let name = (ns.lastPathComponent as NSString).deletingPathExtension
+        let ext = ns.pathExtension
+
+        var bundles: [Bundle] = [Bundle.main]
+        if let resBundle = Bundle.main.url(forResource: "SwiftHakchi_SwiftHakchi", withExtension: "bundle"),
+           let nested = Bundle(url: resBundle) {
+            bundles.append(nested)
+        }
+        for bundle in bundles {
+            if let url = bundle.url(forResource: name, withExtension: ext.isEmpty ? nil : ext,
+                                    subdirectory: dir.isEmpty ? nil : dir) {
+                return try Data(contentsOf: url)
+            }
+        }
+        // `swift run` / test layouts: bundle next to the executable, or the source tree
+        let execURL = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
+        let candidates = [
+            execURL.appendingPathComponent("SwiftHakchi_SwiftHakchi.bundle/Contents/Resources")
+                .appendingPathComponent(relativePath),
+            execURL.appendingPathComponent("SwiftHakchi_SwiftHakchi.bundle").appendingPathComponent(relativePath),
+            execURL.deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("SwiftHakchi/Resources").appendingPathComponent(relativePath),
+        ]
+        for url in candidates where FileManager.default.fileExists(atPath: url.path) {
+            return try Data(contentsOf: url)
+        }
+        throw PayloadError.resourceNotFound(relativePath)
+    }
+
     /// Load a file from the app bundle's Resources directory.
     /// SPM bundles resources via Bundle.module if a resource processing
     /// rule is in Package.swift, but we're using a flat copy, so we

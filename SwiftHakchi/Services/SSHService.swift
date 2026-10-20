@@ -46,6 +46,9 @@ actor SSHService {
 
     var isConnected: Bool { session != nil }
 
+    /// Raw session for extensions in other files (streaming, shell)
+    var sessionHandle: OpaquePointer? { session }
+
     /// Open SSH connection via RNDIS to the console.
     /// Performs: USB open → RNDIS init → ARP → TCP connect → SSH handshake → auth
     func connect() throws {

@@ -66,27 +66,35 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 
 | Feature | CE source | Status |
 |---|---|---|
-| Save-state manager (list, export/import `.clvs`, delete) | `SaveStateManager.cs` | ⬜ |
-| Take screenshot (framebuffer) | `ScreenshotForm.cs` | ⬜ |
-| Save dmesg output | `MainForm` | ⬜ |
-| Boot splash: change / disable / reset | `MainForm` | ⬜ |
-| Switch running firmware (`.hsqs`) | `SelectFirmwareDialog.cs` | ⬜ |
-| Technical information | `TechInfo.cs` | ⬜ |
-| Terminal / file access (substitute for PuTTY and FTP client) | `MainForm` | ⬜ |
-| Format SD card | `Tasks/SDFormat` | ⬜ |
-| Export games to a USB/SD volume (linked export, saves folder) | `ExportGamesDialog.cs` | ⬜ |
+| Save-state manager (list, export/import `.clvs`, delete, screenshots of the selected save) | `SaveStateManager.cs` | ✅ |
+| Take screenshot (framebuffer; copy, save, auto refresh) | `ScreenshotForm.cs` | ✅ |
+| Save dmesg output | `MainForm` | ✅ |
+| Boot splash: change / disable / reset | `MainForm` | ✅ |
+| Switch running firmware (`.hsqs`) | `SelectFirmwareDialog.cs` | ✅ |
+| Technical information (incl. memory stats, console settings, log; copy for bug reports) | `TechInfo.cs`, `MemoryStats.cs` | ✅ |
+| Terminal (line-mode PTY shell) and console file browser — replace PuTTY and the FTP client | `MainForm` | ✅ |
+| Format SD card (non-bootable layout, copy/store saves) | `Tasks/SDFormat` | ✅ |
+| Format SD card: "Make card bootable" / "Copy everything from NAND" | `Tasks/SDFormat` | ➖ CE's own code no longer prepares the `/sd-temp` files this needs |
+| Export games to a USB/SD volume (saves folder, linked export) — flat layout until the sync menu builder lands | `ExportGamesDialog.cs` | 🚧 |
+| Help: Important message (MOTD), Technical information, project links | `MainForm`, `Motd.cs` | ✅ |
+| Startup update of hakchi.hmod (`data/hakchi-latest.hmod`) and `romfiles.xml` | `MainForm` | ✅ |
 
 ## Phase 6 — Kernel and recovery
 
 | Feature | CE source | Status |
 |---|---|---|
-| Reset (reinstall with `mod_uninstall reset`) | `MembootTasks` | ⬜ |
-| Boot original / custom / recovery kernel from RAM | `MembootTasks` | ⬜ |
-| Shell memboot (kexec, no FEL needed) | `MembootTasks.Memboot` | ⬜ |
-| Dump whole NAND | `MembootTasks` | ⬜ |
-| Dump / flash decrypted system software | `MembootTasks` | ⬜ |
-| Dump / flash / format user data partition | `MembootTasks` | ⬜ |
-| Flash U-Boot normal / SD mode | `MembootTasks` | ⬜ |
+| Recovery entry: shell memboot (kexec + detached-fallback) when online, FEL otherwise; "Recovery mode" title | `MembootTasks` | ✅ |
+| Reset (reinstall with `mod_uninstall reset`) | `MembootTasks` | ✅ |
+| Uninstall (flashes the stock kernel back) and "with kernel file" variant | `MembootTasks` | ✅ |
+| Factory reset and "with kernel file" variant | `MembootTasks` | ✅ |
+| Boot original / custom / recovery kernel from RAM | `MembootTasks` | ✅ |
+| Dump original kernel (legacy) | `MembootTasks` | ✅ |
+| Dump whole NAND (streamed to disk) | `MembootTasks` | ✅ |
+| Dump / flash decrypted system software (incl. cryptsetup key-file, mksquashfs) | `MembootTasks` | ✅ |
+| Dump / flash / format user data partition | `MembootTasks` | ✅ |
+| Flash U-Boot normal / SD mode (Developer Tools, ⌃⌥⌘D) | `MembootTasks` | ✅ |
+| Mega Drive rootfs check (Project Lunar, known system hashes) | `MembootTasks.CheckMdRootfs` | ✅ |
+| Reboot in recovery offers to finish the boot sequence | `MainForm` | ✅ |
 
 ## Phase 7 — Modules
 

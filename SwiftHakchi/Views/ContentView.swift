@@ -184,6 +184,8 @@ struct ContentView: View {
             appState.gameManager.loadGames()
             appState.gameManager.matchExistingGames()
         }
+        .task { await appState.runStartupUpdates() }
+        .navigationTitle(appState.deviceManager.isRecoveryMode ? "Swift Hakchi2 — Recovery mode" : "Swift Hakchi2")
     }
 
     /// Always the same view type so HSplitView keeps the divider stable
