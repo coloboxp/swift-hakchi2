@@ -33,9 +33,9 @@ The main change in this fork is a full port of the Hakchi2 CE feature set: emula
 
 ## Installation
 
-This fork has no release downloads. Build it from source (see [Building](#building)); `./install.sh` puts the app in `/Applications`. The releases of the original project do not contain the changes from this fork.
+Download the latest `.zip` from this fork's [Releases](https://github.com/coloboxp/swift-hakchi2/releases), extract it, and double-click **Swift Hakchi2.app**. The build is for Apple Silicon Macs. The releases of the original project do not contain the changes from this fork. You can also build it yourself (see [Building](#building)); `./install.sh` puts the app in `/Applications`.
 
-The app is not signed with an Apple Developer certificate. `install.sh` signs it ad hoc, which is usually enough on the machine that built it. If macOS still blocks it on first launch:
+Because the app is not signed with an Apple Developer certificate, macOS will block it on first launch. To allow it:
 
 1. Open **System Settings > Privacy & Security**
 2. Scroll down to **Security**

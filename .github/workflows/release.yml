@@ -11,7 +11,7 @@ permissions:
 jobs:
   build:
     name: Build and Release
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +42,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          gh release create "$TAG" \
-            "Swift-Hakchi2-${TAG}-macOS.zip" \
-            --title "Swift Hakchi2 ${TAG}" \
-            --generate-notes
+          # Keep a release that was written by hand (notes first, tag later); just attach the zip
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "Swift-Hakchi2-${TAG}-macOS.zip" --clobber
+          else
+            gh release create "$TAG" \
+              "Swift-Hakchi2-${TAG}-macOS.zip" \
+              --title "Swift Hakchi2 ${TAG}" \
+              --generate-notes
+          fi
