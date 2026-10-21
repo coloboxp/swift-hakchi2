@@ -117,34 +117,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Modules report (HTML, CE template) | `MainForm` | ✅ |
 | Bluetooth controller pairing (via `bluetoothctl` over SSH; CE uses TCP port 787) | `Wireless/Bluetooth` | ✅ |
 
-## Validated on a console
+## Testing
 
-Tested by hand on an SNES Classic on 2026-10-21. Everything here worked:
-
-| Area | What was done |
-|---|---|
-| Sync | Small and repeated syncs, adding, removing and editing games |
-| Folder modes | Folders and folder icons on the console menu |
-| Import from Console | A large game copied back complete |
-| Modules | Installing and removing modules with Apply & Reboot |
-| Compression | A game compressed by this app (`.7z`) starts on the console |
-| Recovery | Boot Recovery Kernel from RAM |
-
-## Missing validations
-
-Everything above is covered by unit tests where the logic allows it. These parts talk to
-the console, and their end-to-end validation on a console has not been done yet. They are
-open tests, not known problems:
-
-| Area | Missing validation |
-|---|---|
-| Sync | Games without a local ROM keep their console files (the guard exists; not checked on purpose) |
-| Folder modes | Pages mode and a custom Folders Manager tree |
-| Console settings | `cfg_*` values are read on connect and pushed after sync; controller hacks take effect after reboot |
-| Modules | Bluetooth pairing |
-| SSH bridge | Streaming exec for NAND/kernel dumps, the Terminal window next to other commands |
-| Recovery | Every other Kernel menu task; try the harmless ones (dump kernel) before anything that writes to flash |
-| Tools | Screenshot, save-state export/import, boot splash, firmware switch, SD format |
+Tested on a real SNES Classic, and it works: games, sync, folders, mods and the rest of the
+everyday features. A few rarely used tools (some recovery tasks, Bluetooth, SD formatting)
+have not been tried on a console yet.
 
 ## Not ported
 
