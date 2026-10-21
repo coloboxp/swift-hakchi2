@@ -109,8 +109,8 @@ struct HelpCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     private static let links: [(String, String)] = [
-        ("Swift Hakchi2 Releases", "https://github.com/mattackerman808/swift-hakchi2/releases"),
-        ("Hakchi2 CE FAQ", "https://github.com/TeamShinkansen/hakchi2/wiki/FAQ"),
+        ("Swift Hakchi2 Releases", "https://github.com/coloboxp/swift-hakchi2/releases"),
+        ("hakchi FAQ", "https://github.com/TeamShinkansen/hakchi2/wiki/FAQ"),
         ("Discord: Rockin' The Classics", "https://discord.gg/C9EDFyg"),
         ("Reddit: r/RockinTheClassics", "https://www.reddit.com/r/RockinTheClassics/"),
     ]

@@ -180,7 +180,7 @@ struct AboutCommands: Commands {
                     ]
                 ))
 
-                let url = URL(string: "https://github.com/mattackerman808/swift-hakchi2")!
+                let url = URL(string: "https://github.com/coloboxp/swift-hakchi2")!
                 credits.append(NSAttributedString(
                     string: "GitHub",
                     attributes: [

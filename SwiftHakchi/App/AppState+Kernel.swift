@@ -84,7 +84,7 @@ extension AppState {
 
     func kernelUninstall(withKernelFile: Bool) {
         guard KernelDialogs.confirm(title: "Are you sure?",
-                                    message: "Do you really want to remove all traces of hakchi2 and return your mini to its original state?")
+                                    message: "Do you really want to remove all traces of hakchi and return your mini to its original state?")
         else { return }
         runRecovery(withKernelFile ? "Uninstall and flash kernel file" : "Uninstalling hakchi") { svc, p in
             try await svc.uninstall(ignoreBackupKernel: withKernelFile,

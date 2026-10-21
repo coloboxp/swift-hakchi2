@@ -6,7 +6,7 @@ import Foundation
 /// htm layout (CE's TreeToXml):
 /// ```
 /// <!DOCTYPE html>
-/// <html lang=""><head><title>Hakchi2 CE Games - X</title><style>…</style></head>
+/// <html lang=""><head><title>Swift Hakchi2 Games - X</title><style>…</style></head>
 /// <body><h1>X</h1><ul>
 ///   <li data-type="folder" data-icon="folder_a" data-position="3">Name<ul>…</ul></li>
 ///   <li data-type="application" class="icon-0" data-code="CLV-H-ABCDE">Game</li>
@@ -46,7 +46,7 @@ enum FolderTreeStore {
         var visited: [MenuCollection] = [root]
         writeItems(root, into: &body, visited: &visited)
         let t = escape(title)
-        return "<!DOCTYPE html>\n<html lang=\"\"><head><title>Hakchi2 CE Games - \(t)</title>"
+        return "<!DOCTYPE html>\n<html lang=\"\"><head><title>Swift Hakchi2 Games - \(t)</title>"
             + "<style>\(css)</style></head><body><h1>\(t)</h1><ul>\(body)</ul></body></html>"
     }
 
@@ -144,5 +144,5 @@ enum FolderTreeStore {
 enum FolderTreeError: LocalizedError {
     case invalidFile
 
-    var errorDescription: String? { "The folders file is not a valid Hakchi2 CE folders file." }
+    var errorDescription: String? { "The folders file is not a valid folders file." }
 }

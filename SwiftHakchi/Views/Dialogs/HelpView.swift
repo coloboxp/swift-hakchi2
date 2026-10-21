@@ -9,7 +9,9 @@ struct HelpView: View {
         case flashing = "Flashing the Console"
         case managingGames = "Managing Games"
         case syncing = "Syncing Games"
+        case structure = "Menu Structure"
         case modules = "Modules (hmods)"
+        case tools = "Tools"
         case settings = "Settings"
         case troubleshooting = "Troubleshooting"
 
@@ -21,7 +23,9 @@ struct HelpView: View {
             case .flashing: return "cpu"
             case .managingGames: return "gamecontroller"
             case .syncing: return "arrow.triangle.2.circlepath"
+            case .structure: return "folder"
             case .modules: return "shippingbox"
+            case .tools: return "hammer"
             case .settings: return "gearshape"
             case .troubleshooting: return "wrench.and.screwdriver"
             }
@@ -66,7 +70,7 @@ struct HelpView: View {
                 }
             }
         }
-        .frame(width: 650, height: 500)
+        .frame(width: 700, height: 540)
     }
 
     // MARK: - Section content
@@ -78,7 +82,9 @@ struct HelpView: View {
         case .flashing: flashingContent
         case .managingGames: managingGamesContent
         case .syncing: syncingContent
+        case .structure: structureContent
         case .modules: modulesContent
+        case .tools: toolsContent
         case .settings: settingsContent
         case .troubleshooting: troubleshootingContent
         }
@@ -90,7 +96,7 @@ struct HelpView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Getting Started")
 
-            bodyText("Swift Hakchi2 is a native macOS tool for modding Nintendo NES Classic Mini and SNES Classic Mini consoles. It lets you install a custom kernel, import your own game ROMs, and sync them to your console over USB.")
+            bodyText("Swift Hakchi2 is a native macOS tool for modding the Nintendo NES Classic Mini and SNES Classic Mini. It lets you install hakchi, add your own games, choose emulators, organize the console menu into folders, install mods, and look after your console \u{2014} all over USB.")
 
             heading("Requirements")
             bulletList([
@@ -153,10 +159,22 @@ struct HelpView: View {
             heading("Other Kernel Operations")
             bodyText("Additional operations are available in the Kernel menu:")
             bulletList([
-                "Uninstall \u{2014} Removes the custom kernel and restores stock",
-                "Factory Reset \u{2014} Full restore using a kernel backup file you select",
-                "Shutdown \u{2014} Powers off the console",
+                "Install / Repair \u{2014} Installs hakchi, or repairs an existing install",
+                "Reset \u{2014} Resets and repairs hakchi on the console",
+                "Uninstall \u{2014} Removes hakchi and restores the stock kernel (also with a kernel file you choose)",
+                "Factory Reset \u{2014} Returns the console to how it left the factory (also with a kernel file you choose)",
+                "Reboot and Shutdown",
             ])
+
+            heading("Recovery (Kernel \u{2192} Advanced)")
+            bodyText("For backups and for fixing a console that does not start:")
+            bulletList([
+                "Boot the original, custom or recovery kernel from RAM, without writing anything",
+                "Dump the original kernel or the whole NAND flash",
+                "Dump and flash the system software and the user data partition, or format user data",
+                "Flash U-Boot (normal or SD mode)",
+            ])
+            bodyText("Start with the tasks that only read (booting from RAM, dumps). Anything that writes to flash should be your last step.")
         }
     }
 
@@ -167,16 +185,23 @@ struct HelpView: View {
             sectionTitle("Managing Games")
 
             heading("Adding ROMs")
-            bodyText("Click the \"Add ROMs\" button in the top-right of the Games Explorer. Select one or more ROM files from your Mac. Supported formats:")
+            bodyText("Click the \"Add ROMs\" button in the Games Explorer, or choose File \u{2192} Add Games... You can add:")
             bulletList([
-                ".nes \u{2014} NES / Famicom ROMs",
-                ".sfc, .smc \u{2014} SNES / Super Famicom ROMs",
-                ".md, .bin \u{2014} Sega Genesis / Mega Drive ROMs",
-                ".zip \u{2014} Compressed ROM archives",
+                "ROMs for about 20 systems (NES, SNES, Mega Drive, Game Boy, GBA, PC Engine, arcade and more)",
+                ".zip and .7z archives (RAR is not supported)",
+                ".clvg game packs and .desktop files",
+                "CD images (.cue, .gdi, .m3u)",
             ])
+            bodyText("If a file fits more than one system, the app asks which one. New games are compressed to .7z by default (see Settings \u{2192} Library). \"Add Games As-Is...\" skips patching and compression.")
+
+            heading("Emulation Core")
+            bodyText("Each game runs in an emulator (a libretro core). To change it, select one or more games and choose Game \u{2192} Select Emulation Core..., or right-click them. The list of cores is read from the connected console.")
+
+            heading("Working with Many Games")
+            bodyText("Cmd-click or Shift-click to select several games. Right-click for actions such as Compress / Decompress, Repair Games, Add or Remove Prefix, Scrape Selected Games, and Archive Selected Games.")
 
             heading("Importing from Console")
-            bodyText("If your console already has custom games installed, click the \"Import from Console\" button in the Games Explorer header (only available while connected). This copies games from the console into your local library.")
+            bodyText("If your console already has custom games installed, click the \"Import from Console\" button in the Games Explorer header (only available while connected). This copies games from the console into your local library, big ones included.")
 
             heading("Auto-Matching")
             bodyText("When you import a ROM, the app calculates its CRC32 checksum and looks it up in a built-in game database. If a match is found, the game name, publisher, release date, and cover art are filled in automatically.")
@@ -189,6 +214,8 @@ struct HelpView: View {
                 "Players \u{2014} Number of players (1\u{2013}4) with a Simultaneous toggle",
                 "Command Line \u{2014} The launch command (advanced, usually auto-configured)",
                 "Description \u{2014} Free-text description of the game",
+                "Box art and spine \u{2014} Change the cover, or make a spine image",
+                "Game Genie \u{2014} Cheat codes, applied to a copy of the ROM when you sync",
             ])
             bodyText("Click \"Save\" in the detail panel to save your changes.")
 
@@ -226,13 +253,30 @@ struct HelpView: View {
             bodyText("Stock games can be hidden by dragging them off the bar, or re-enabled by right-clicking and choosing \"Re-enable\".")
 
             heading("Syncing")
-            bodyText("Click the \"Sync\" button in the center of the Console Game Bar header. The app compresses the selected ROMs, uploads them to the console via USB, and rebuilds the console's game menu. The console must be connected (green status).")
+            bodyText("Click the \"Sync\" button in the center of the Console Game Bar header. The app compares the console with your selection and only uploads what changed, then rebuilds the console's game menu. The console must be connected (green status).")
 
             heading("Storage Limits")
-            bodyText("The console has approximately 300 MB of usable storage. You can set a maximum game size in Settings to skip oversized ROMs during sync.")
+            bodyText("The console has approximately 300 MB of usable storage. Compressed games take less space.")
 
             heading("Safety")
-            bodyText("If syncing would remove games already on the console that aren't in your current selection, the app warns you and offers to import them first so you don't lose anything.")
+            bodyText("If syncing would remove games already on the console that aren't in your current selection, the app warns you and offers to import them first so you don't lose anything. Games whose ROM is not on your Mac keep their files on the console.")
+        }
+    }
+
+    // MARK: - Menu Structure
+
+    private var structureContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Menu Structure")
+
+            bodyText("The Structure menu decides how your games appear on the console.")
+            bulletList([
+                "Maximum Games per Page/Folder \u{2014} Split the list into pages or folders, or keep it on one page",
+                "Folders Manager... \u{2014} Build your own folder layout by hand",
+                "Back Folder Button Position and Folder Images Set \u{2014} How folders look on the console",
+                "Selection Presets \u{2014} Save which games are selected, and switch back to it later",
+                "Save Settings to Console Now \u{2014} Send the console settings without a full sync",
+            ])
         }
     }
 
@@ -245,22 +289,37 @@ struct HelpView: View {
             bodyText("Modules (also called hmods) are add-on packages that extend your console's capabilities \u{2014} RetroArch cores for additional emulators, themes, and other enhancements.")
 
             heading("Opening the Module Manager")
-            bodyText("Open the Module Manager from the Modules menu or press Cmd+Shift+M.")
-
-            heading("Browsing & Installing")
-            numberedList([
-                "Switch to the \"Browse\" tab",
-                "Click \"Load Repository\" to fetch the list of available modules",
-                "Use the category filter to narrow results",
-                "Click \"Install\" next to the module you want",
+            bodyText("Open the Module Manager from the Modules menu or press Cmd+Shift+M. It has three tabs:")
+            bulletList([
+                "Installed \u{2014} Modules on the console. Select some and click \"Uninstall Selected\".",
+                "Library \u{2014} .hmod files kept on your Mac. Add files or folders, or drop them here, then click \"Install Selected\".",
+                "Mod Hub \u{2014} Online repositories. Pick a repository, click \"Load Repository\", then \"Install\", \"Download\" or \"Add to Library\".",
             ])
-            bodyText("You can also install a module from a local .hmod file using the \"Install from File...\" button.")
 
-            heading("Viewing Installed Modules")
-            bodyText("The \"Installed\" tab shows all modules currently on your console (the console must be connected). Each entry shows the module name, version, and category.")
+            heading("Apply & Reboot")
+            bodyText("Installs and removals are prepared on the console first. Click \"Apply & Reboot\": hakchi applies the changes while the console starts, then restarts once more. This takes about a minute.")
 
-            heading("Removing Modules")
-            bodyText("In the \"Installed\" tab, select one or more modules, then click \"Uninstall Selected\".")
+            heading("Repositories and Bluetooth")
+            bodyText("Add, remove or reorder repositories with Modules \u{2192} Manage Repositories... Modules \u{2192} Bluetooth... pairs wireless controllers.")
+        }
+    }
+
+    // MARK: - Tools
+
+    private var toolsContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Tools")
+
+            bodyText("The Tools menu works with a connected console:")
+            bulletList([
+                "Save-State Manager \u{2014} Export, import and delete save states",
+                "Take Screenshot \u{2014} Save what the console shows right now",
+                "Terminal and Console Files \u{2014} A command line and a file browser for the console",
+                "Boot Splash \u{2014} Change, disable or reset the start-up image",
+                "Switch Running Firmware \u{2014} Start another firmware installed on the console",
+                "Export Games \u{2014} Copy your games to a USB stick or SD card",
+                "Format SD Card \u{2014} Prepare an SD card for the console",
+            ])
         }
     }
 
@@ -270,7 +329,7 @@ struct HelpView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Settings")
 
-            bodyText("Open Settings from the Swift Hakchi2 menu or press Cmd+,. Settings are organized into three tabs.")
+            bodyText("Open Settings from the Swift Hakchi2 menu or press Cmd+,. Settings are organized into five tabs.")
 
             heading("Console Tab")
             bulletList([
@@ -283,8 +342,13 @@ struct HelpView: View {
             bulletList([
                 "Upload games compressed \u{2014} Compress ROMs during sync to save console storage",
                 "Separate game storage per console \u{2014} Keep game files separate for each console type",
-                "Max game size (MB) \u{2014} Skip ROMs larger than this limit during sync",
                 "Games folder \u{2014} Shows the path where your imported game library is stored",
+            ])
+
+            heading("Library Tab")
+            bulletList([
+                "When adding games \u{2014} Compress to 7z, box-art options, SFROM conversion, online lookup",
+                "View \u{2014} How the explorer shows and sorts games",
             ])
 
             heading("Advanced Tab")
@@ -292,6 +356,9 @@ struct HelpView: View {
                 "Purge All Cover Art \u{2014} Deletes all cached cover images and re-downloads them from the game database. Useful if artwork appears corrupted.",
                 "Purge All Imported Games \u{2014} Removes all imported ROMs, cached data, and cover art from the library. Built-in console games are not affected, and your original ROM files on disk are not deleted.",
             ])
+
+            heading("Console Settings Tab")
+            bodyText("Controller hacks (reset combination, autofire, and more) and console options. They are read from the console when it connects and saved to it after a sync.")
         }
     }
 
