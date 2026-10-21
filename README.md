@@ -4,9 +4,25 @@ A native macOS application for modding Nintendo mini consoles, built with Swift 
 
 ## About this fork
 
-This is a personal fork of [mattackerman808/swift-hakchi2](https://github.com/mattackerman808/swift-hakchi2). It is maintained on its own and is not meant to be merged back upstream.
+> **In short: this version does a lot more than the original Swift Hakchi2.** It can do almost everything the Windows program Hakchi2 CE can do, on a Mac. Get it from this fork's [Releases](https://github.com/coloboxp/swift-hakchi2/releases) page (v2.0.0 and later).
 
-The main change in this fork is a full port of the Hakchi2 CE feature set: emulation cores, incremental sync with folders, the Folders Manager, console settings, tools, every kernel and recovery task, and a complete module manager. Only Windows-only or obsolete CE features are left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was not ported and why, and the parts that still need a check on real hardware.
+This is a personal fork of [mattackerman808/swift-hakchi2](https://github.com/mattackerman808/swift-hakchi2). The original app (v1.0) was a great start: it could install hakchi, add games and copy them to the console. This fork carries on from there and fills in the rest of Hakchi2 CE. It is maintained on its own and will not be merged back into the original project.
+
+### What you get here that the original does not have
+
+| | Original (v1.0) | This fork (v2.0) |
+|---|---|---|
+| Installing mods (hmods) | The install buttons did nothing | Works, from several online repositories or your own files |
+| Copying games to the console | Wipes the game folder and uploads everything each time | Only uploads what changed, and never deletes games it can't put back |
+| Getting games back from the console | Big games failed | Downloads games of any size |
+| Picking the emulator for a game | Not possible | Choose the emulator (core) for each game |
+| Kinds of games you can add | A few ROM types for a few consoles | About 20 systems, archives, CD images, game packs, patches and Game Genie codes |
+| Folders on the console menu | All your games in one "More games" folder | Folders or pages, or your own folder layout |
+| Console options and controller tweaks | Not possible | Set them from the app |
+| Save states, screenshots, boot splash, SD cards | Not possible | All in the Tools menu |
+| Fixing a broken console | Uninstall, factory reset and a kernel backup | Every recovery tool from Hakchi2 CE, such as starting from a rescue kernel and full backups |
+
+Only the parts of Hakchi2 CE that make sense on Windows alone, or that are out of date, were left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was left out and why, and which parts still need testing on a real console.
 
 ## Supported Consoles
 
