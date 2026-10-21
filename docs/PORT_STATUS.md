@@ -117,12 +117,13 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Modules report (HTML, CE template) | `MainForm` | ✅ |
 | Bluetooth controller pairing (via `bluetoothctl` over SSH; CE uses TCP port 787) | `Wireless/Bluetooth` | ✅ |
 
-## Needs a check on real hardware
+## Missing validations
 
-Everything above is covered by unit tests where the logic allows it, but these parts
-talk to the console and were written without one. Check them before relying on them:
+Everything above is covered by unit tests where the logic allows it. These parts talk to
+the console, and their end-to-end validation on a console has not been done yet. They are
+open tests, not known problems:
 
-| Area | What to check |
+| Area | Missing validation |
 |---|---|
 | Sync | First incremental sync on a console with existing games: nothing deleted that should stay, games without a local ROM keep their console files, second sync uploads nothing |
 | Folder modes | Folders, pages and the Folders Manager tree show up on the console menu; back/home folders work |

@@ -22,7 +22,7 @@ This is a personal fork of [mattackerman808/swift-hakchi2](https://github.com/ma
 | Save states, screenshots, boot splash, SD cards | Not possible | All in the Tools menu |
 | Fixing a broken console | Uninstall, factory reset and a kernel backup | Every recovery tool from Hakchi2 CE, such as starting from a rescue kernel and full backups |
 
-Only the parts of Hakchi2 CE that make sense on Windows alone, or that are out of date, were left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was left out and why, and which parts still need testing on a real console.
+Only the parts of Hakchi2 CE that make sense on Windows alone, or that are out of date, were left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was left out and why, and which tests and validations are still missing.
 
 ## Supported Consoles
 
@@ -198,7 +198,7 @@ vendor/               Vendored C dependencies
 └── lzma/             LZMA SDK (public domain, used to write .7z archives)
 
 Tests/SwiftHakchiTests/   Unit tests (Swift Testing)
-docs/PORT_STATUS.md       Hakchi2 CE feature parity, hardware check list
+docs/PORT_STATUS.md       Hakchi2 CE feature parity, missing validations
 ```
 
 ## License
