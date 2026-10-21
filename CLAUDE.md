@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Swift Hakchi2 is a native macOS rewrite of Hakchi2 CE — a tool for modding Nintendo mini consoles (NES/SNES Classic). It handles custom kernel installation, game management, and console communication over USB. Built with Swift/SwiftUI and a C-based USB protocol layer.
 
+## Repository
+
+This is a personal fork. `origin` is the fork (`coloboxp/swift-hakchi2`); `upstream` is the original project (`mattackerman808/swift-hakchi2`). Work stays in the fork: do not open pull requests against upstream. Feature parity with Hakchi2 CE is tracked in `docs/PORT_STATUS.md`.
+
 ## Build & Run
 
 ```bash

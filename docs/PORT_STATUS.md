@@ -140,7 +140,7 @@ talk to the console and were written without one. Check them before relying on t
 |---|---|
 | FEL driver install (libwdi) | Windows-only; macOS needs no driver |
 | SFROM Tool integration, PCM patch | Third-party Windows `.exe` |
-| AutoUpdater.NET app updates | Windows-only; releases are on GitHub |
+| AutoUpdater.NET app updates | Windows-only; this fork is built from source with `install.sh` |
 | Clovershell transport | Obsolete; hakchi uses RNDIS/SSH |
 | Flash the whole NAND | Not implemented in CE either |
 | Google Images box-art scraping | Scrapes Google's HTML (fragile, against its terms); TheGamesDB covers this |

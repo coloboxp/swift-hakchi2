@@ -1,6 +1,12 @@
 # Swift Hakchi2
 
-A native macOS application for modding Nintendo mini consoles, built with Swift and SwiftUI. This is a ground-up rewrite of [Hakchi2 CE](https://github.com/TeamShinkansen/Hakchi2-CE) targeting macOS.
+A native macOS application for modding Nintendo mini consoles, built with Swift and SwiftUI. It is a ground-up rewrite of [Hakchi2 CE](https://github.com/TeamShinkansen/Hakchi2-CE) for macOS.
+
+## About this fork
+
+This is a personal fork of [mattackerman808/swift-hakchi2](https://github.com/mattackerman808/swift-hakchi2). It is maintained on its own and is not meant to be merged back upstream.
+
+The main change in this fork is a full port of the Hakchi2 CE feature set: emulation cores, incremental sync with folders, the Folders Manager, console settings, tools, every kernel and recovery task, and a complete module manager. Only Windows-only or obsolete CE features are left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was not ported and why, and the parts that still need a check on real hardware.
 
 ## Supported Consoles
 
@@ -9,12 +15,15 @@ A native macOS application for modding Nintendo mini consoles, built with Swift 
 
 ## Features
 
-- **Custom Kernel Install** — Flash a custom kernel to enable homebrew, or uninstall/factory reset
-- **Game Management** — Import ROMs, auto-match metadata via CRC32, edit game details
-- **Drag-and-Drop Sync** — Drag games into the Console Game Bar, click Sync to upload over USB
-- **Module Manager** — Browse, install, and manage hakchi modules (hmods) from an online repository
-- **Scraper** — Search TheGamesDB for cover art, descriptions, and metadata
-- **Stock Kernel Backup** — Back up and restore the original kernel
+- **Custom kernel** — install, repair, uninstall and factory reset, plus recovery tasks: boot kernels from RAM, dump and flash partitions, flash U-Boot
+- **Game library** — import ROMs, archives, `.clvg` packs and CD images (`.cue`, `.gdi`, `.m3u`) for about 20 systems; CRC32 matching for name, publisher and box art; IPS patches; Game Genie codes; optional `.7z` compression
+- **Emulation cores** — choose the libretro core per game; the list is read from the connected console
+- **Incremental sync** — uploads only what changed; games with no local ROM keep their files on the console
+- **Menu structure** — folders or pages with a game limit, a custom tree in the Folders Manager, folder images and selection presets
+- **Console settings** — controller hacks and console options, read from and written to the console
+- **Modules** — installed modules, a local module library, several online repositories, and Bluetooth pairing
+- **Tools** — save-state manager, screenshots, a terminal and a file browser, boot splash, firmware switch, export to USB/SD and SD card formatting
+- **Scraper** — search TheGamesDB for cover art, descriptions and metadata
 
 ## Requirements
 
@@ -24,9 +33,9 @@ A native macOS application for modding Nintendo mini consoles, built with Swift 
 
 ## Installation
 
-Download the latest `.zip` from [Releases](https://github.com/mattackerman808/swift-hakchi2/releases), extract it, and double-click **Swift Hakchi2.app**.
+This fork has no release downloads. Build it from source (see [Building](#building)); `./install.sh` puts the app in `/Applications`. The releases of the original project do not contain the changes from this fork.
 
-Because the app is not signed with an Apple Developer certificate, macOS will block it on first launch. To allow it:
+The app is not signed with an Apple Developer certificate. `install.sh` signs it ad hoc, which is usually enough on the machine that built it. If macOS still blocks it on first launch:
 
 1. Open **System Settings > Privacy & Security**
 2. Scroll down to **Security**
@@ -39,6 +48,8 @@ Alternatively, right-click the app and choose **Open** to bypass the warning onc
 Clone the repository and run:
 
 ```bash
+git clone https://github.com/coloboxp/swift-hakchi2.git
+cd swift-hakchi2
 ./run.sh
 ```
 
@@ -70,7 +81,7 @@ SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build
 The main window is organized top to bottom:
 
 1. **Action Bar** — Buttons for **Install Kernel**, **Connect/Disconnect**, **Memboot**, and **Reboot**
-2. **Games Explorer** — Your ROM library displayed as a grid of cover art cards (left), with an editable detail panel (right). The header has **Add ROMs** and **Import from Console** buttons, plus a search field.
+2. **Games Explorer** — Your ROM library displayed as a grid of cover art cards (left), with an editable detail panel (right). The header has **Add ROMs** and **Import from Console** buttons, plus a search field. You can select several games at once (Cmd-click or Shift-click).
 3. **Console Game Bar** — A tray along the bottom labeled "Desired Console Config" that shows which games will be on your console after the next sync. Has **Custom Games** and **Default Games** tabs, and a centered **Sync** button.
 4. **Status Bar** — Connection indicator (green = connected, orange = FEL mode, red = disconnected), console type, and game counts.
 
@@ -85,12 +96,14 @@ The main window is organized top to bottom:
    - Release after 3 seconds
 4. The app flashes the custom kernel automatically once the console is detected
 
-Additional kernel operations are in the **Kernel** menu: Uninstall, Factory Reset, and Shutdown.
+Other kernel tasks are in the **Kernel** menu: Reset, Uninstall, Factory Reset (also with a kernel file you choose), Reboot and Shutdown. **Kernel > Advanced** has the recovery tasks: boot the original, custom or recovery kernel from RAM, dump the kernel or the whole NAND, dump and flash the system software and the user data partition, format user data, and flash U-Boot. Try the harmless ones (boot from RAM, dumps) before anything that writes to flash.
 
 ### Managing Games
 
-- **Add ROMs** — Click "Add ROMs" in the Games Explorer header. Supported formats: `.nes`, `.sfc`, `.smc`, `.md`, `.bin`, `.zip`
-- **Import from Console** — Click "Import from Console" to copy existing custom games from a connected console into your library
+- **Add ROMs** — Click "Add ROMs" in the Games Explorer header, or use **File > Add Games...**. ROMs, archives (`.zip`, `.7z`; RAR is not supported), `.clvg` packs, `.desktop` files and CD images are accepted. When a file fits more than one system, the app asks which one. **Add Games As-Is...** skips patching and compression.
+- **Import from Console** — Copies existing custom games from a connected console into your library, including large ROMs
+- **Emulation core** — Select one or more games and choose **Game > Select Emulation Core...** to change the libretro core and its command-line options
+- **Game Genie** — Codes are stored per game and applied to a copy of the ROM during sync; the library file is not changed
 - **Auto-matching** — Imported ROMs are matched by CRC32 against a built-in database to fill in name, publisher, release date, and cover art
 - **Edit details** — Click any game card to select it. The detail panel shows editable fields for name, publisher, genre, release date, players, command line, and description. Click "Save" to persist changes.
 - **Scraper** — Select a game and click "Search Online..." in the detail panel to search TheGamesDB for metadata and cover art. Requires an API key (see Settings).
@@ -104,23 +117,41 @@ Additional kernel operations are in the **Kernel** menu: Uninstall, Factory Rese
 4. Stock games can be hidden by dragging them off, or re-enabled via right-click → "Re-enable"
 5. Click the **Sync** button in the Console Game Bar to upload everything to the console
 
-The console has approximately 300 MB of usable storage. If syncing would remove games already on the console, the app warns you and offers to import them first.
+Sync is incremental: the app compares the files on the console with the local ones and uploads only what changed. If a selected game has no ROM on the Mac, its files on the console are kept and the app warns you. The console has about 300 MB of usable storage.
+
+### Menu Structure
+
+The **Structure** menu decides how games appear on the console:
+
+- **Maximum Games per Page/Folder** — split the list into pages or folders, or keep one page
+- **Folders Manager...** — build your own folder tree; it is used when the folders mode is set to custom
+- **Back Folder Button Position** and **Folder Images Set** — how folders look
+- **Selection Presets** — save and restore which games are selected
 
 ### Modules (hmods)
 
 Open the **Module Manager** from the Modules menu (Cmd+Shift+M):
 
-- **Browse tab** — Loads the KMFD Mod Hub repository (cached for a day; the reload button fetches it again). Search or filter by category, then click "Install" next to any module. You can also use "Install from File..." for local `.hmod` files or unpacked `.hmod` folders.
-- **Installed tab** — View modules on the console, select any to uninstall with "Uninstall Selected"
+- **Installed** — modules on the console; select any to uninstall
+- **Library** — `.hmod` files you keep on the Mac, ready to install
+- **Mod Hub** — browse the configured repositories (the KMFD repository by default). Add or remove repositories with **Modules > Manage Repositories...**
 - **Apply & Reboot** — Installs and removals are staged on the console first. Click "Apply & Reboot": hakchi applies the changes while the console boots, then reboots once more. This takes about a minute.
+
+The Modules menu also has **Bluetooth...** for pairing controllers and **Generate Modules Report...**.
+
+### Tools
+
+The **Tools** menu has a save-state manager, screenshots, dmesg output, a **Terminal** and a **Console Files** browser (instead of PuTTY and FTP), the boot splash, **Switch Running Firmware...**, **Export Games...** to a USB stick or SD card, and **Format SD Card...**.
 
 ### Settings
 
 Open from the Swift Hakchi2 menu (Cmd+,):
 
-- **Console tab** — Default console type (NES/SNES/Famicom/Super Famicom), TheGamesDB API key, and "Enrich Library Now" button to bulk-fetch metadata
-- **Storage tab** — Upload games compressed, separate game storage per console, max game size (MB), and games folder path
-- **Advanced tab** — Purge all cover art (re-downloads from database), purge all imported games (clears library, does not delete original ROM files)
+- **Console** — Default console type (NES/SNES/Famicom/Super Famicom), TheGamesDB API key, and "Enrich Library Now" to fetch metadata for the whole library
+- **Storage** — Upload games compressed, separate game storage per console, max game size (MB), and games folder path
+- **Library** — What happens when games are added (7z compression, on by default as in CE; box-art options; SFROM conversion; online lookup), and how the explorer shows and sorts games
+- **Advanced** — Purge all cover art (re-downloads from database), purge all imported games (clears library, does not delete original ROM files)
+- **Console Settings** — Controller hacks and console options, read from the console when it connects and saved to it after a sync
 
 ## How It Works
 
@@ -138,7 +169,7 @@ SwiftHakchi/          Swift application
 ├── Models/           Data models (Game, ConsoleType, DesktopFile, AppConfig)
 ├── Services/         Actor-based business logic (device, flash, games, SSH, FEL)
 ├── Views/            SwiftUI interface
-├── Utilities/        Helpers (TarWriter, CRC32, Game Genie codecs)
+├── Utilities/        Helpers (TarWriter, CRC32, Game Genie codecs, NES/FDS/SNES ROM formats, IPS)
 └── Resources/        Binary payloads (fes1.bin, hakchi.hmod, basehmods.tar)
 
 USBBridge/            C library — USB and network protocol stack
@@ -147,7 +178,11 @@ USBBridge/            C library — USB and network protocol stack
 
 vendor/               Vendored C dependencies
 ├── mbedtls/          MBedTLS (cryptography, used by libssh2)
-└── libssh2/          LibSSH2 (SSH protocol)
+├── libssh2/          LibSSH2 (SSH protocol)
+└── lzma/             LZMA SDK (public domain, used to write .7z archives)
+
+Tests/SwiftHakchiTests/   Unit tests (Swift Testing)
+docs/PORT_STATUS.md       Hakchi2 CE feature parity, hardware check list
 ```
 
 ## License
