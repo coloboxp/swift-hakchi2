@@ -22,7 +22,7 @@ This is a personal fork of [mattackerman808/swift-hakchi2](https://github.com/ma
 | Save states, screenshots, boot splash, SD cards | Not possible | All in the Tools menu |
 | Fixing a broken console | Uninstall, factory reset and a kernel backup | Every recovery tool from Hakchi2 CE, such as starting from a rescue kernel and full backups |
 
-Only the parts of Hakchi2 CE that make sense on Windows alone, or that are out of date, were left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was left out and why, and which tests and validations are still missing.
+Only the parts of Hakchi2 CE that make sense on Windows alone, or that are out of date, were left out. [`docs/PORT_STATUS.md`](docs/PORT_STATUS.md) lists every feature, what was left out and why, what has already been tested on a real SNES Classic (syncing, folders and icons, mods, compressed games, copying games back), and which tests and validations are still missing.
 
 ## Supported Consoles
 

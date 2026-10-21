@@ -117,6 +117,19 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ➖ not ported (Windo
 | Modules report (HTML, CE template) | `MainForm` | ✅ |
 | Bluetooth controller pairing (via `bluetoothctl` over SSH; CE uses TCP port 787) | `Wireless/Bluetooth` | ✅ |
 
+## Validated on a console
+
+Tested by hand on an SNES Classic on 2026-10-21. Everything here worked:
+
+| Area | What was done |
+|---|---|
+| Sync | Small and repeated syncs, adding, removing and editing games |
+| Folder modes | Folders and folder icons on the console menu |
+| Import from Console | A large game copied back complete |
+| Modules | Installing and removing modules with Apply & Reboot |
+| Compression | A game compressed by this app (`.7z`) starts on the console |
+| Recovery | Boot Recovery Kernel from RAM |
+
 ## Missing validations
 
 Everything above is covered by unit tests where the logic allows it. These parts talk to
@@ -125,14 +138,12 @@ open tests, not known problems:
 
 | Area | Missing validation |
 |---|---|
-| Sync | First incremental sync on a console with existing games: nothing deleted that should stay, games without a local ROM keep their console files, second sync uploads nothing |
-| Folder modes | Folders, pages and the Folders Manager tree show up on the console menu; back/home folders work |
+| Sync | Games without a local ROM keep their console files (the guard exists; not checked on purpose) |
+| Folder modes | Pages mode and a custom Folders Manager tree |
 | Console settings | `cfg_*` values are read on connect and pushed after sync; controller hacks take effect after reboot |
-| Import from Console | Large ROMs (e.g. 32 MB GBA, `.7z`) arrive complete |
-| Modules | Install/uninstall through the transfer folder + Apply & Reboot; Bluetooth pairing |
-| Compression | Games compressed by this app (`.7z`, LZMA) start on the console (hakchi's tiny7zx) |
-| SSH bridge | Streaming exec (NAND/kernel dumps, large uploads), the Terminal window next to other commands |
-| Recovery | Shell memboot (kexec) and every Kernel menu task; try the harmless ones (boot recovery, dump kernel) first |
+| Modules | Bluetooth pairing |
+| SSH bridge | Streaming exec for NAND/kernel dumps, the Terminal window next to other commands |
+| Recovery | Every other Kernel menu task; try the harmless ones (dump kernel) before anything that writes to flash |
 | Tools | Screenshot, save-state export/import, boot splash, firmware switch, SD format |
 
 ## Not ported
